@@ -142,3 +142,6 @@ def serve_css():
 @app.get("/app.js")
 def serve_js():
     return FileResponse("app.js")
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
