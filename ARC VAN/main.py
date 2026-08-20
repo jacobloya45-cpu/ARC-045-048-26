@@ -189,3 +189,34 @@ async def driver_broadcast(payload: BroadcastPayload, x_driver_pin: str = Header
         raise HTTPException(status_code=500, detail="Failed to broadcast notification")
         
     return {"status": "success", "message": "Alert sent successfully to all riders"}
+import os
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# 1. Health Check Endpoint for Render
+@app.get("/healthz")
+async def health_check():
+    return {"status": "healthy"}
+
+# 2. Base Route (Fixes the 404 error and keeps Render alive)
+@app.get("/")
+async def serve_index():
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"status": "ok", "message": "Server is running"}
+
+# 3. Serve CSS and JS assets if placed in the same folder
+@app.get("/style.css")
+async def serve_css():
+    if os.path.exists("style.css"):
+        return FileResponse("style.css", media_type="text/css")
+    return FileResponse("index.html")
+
+@app.get("/app.js")
+async def serve_js():
+    if os.path.exists("app.js"):
+        return FileResponse("app.js", media_type="application/javascript")
+    return FileResponse("index.html")
