@@ -145,3 +145,47 @@ def serve_js():
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
+import urllib.request
+import urllib.parse
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+NTFY_TOPIC = "arc-van-fortliberty-alerts"  # Change this to your chosen topic name
+
+def send_push_notification(title: str, message: str, priority: str = "default", tags: str = "minibus"):
+    """Sends a free instant push notification via ntfy.sh"""
+    url = f"https://ntfy.sh/{NTFY_TOPIC}"
+    headers = {
+        "Title": title.encode("utf-8"),
+        "Priority": priority,     # Options: min, low, default, high, urgent
+        "Tags": tags              # Adds an emoji/icon (e.g., minibus, warning, round_pushpin)
+    }
+    req = urllib.request.Request(url, data=message.encode("utf-8"), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req) as response:
+            return response.status == 200
+    except Exception as e:
+        print(f"Error sending ntfy notification: {e}")
+        return False
+
+class BroadcastPayload(BaseModel):
+    current_stop: str
+    status_message: str
+
+@app.post("/api/driver/broadcast")
+async def driver_broadcast(payload: BroadcastPayload, x_driver_pin: str = Header(None)):
+    # Verify Driver PIN
+    if x_driver_pin != "045048":
+        raise HTTPException(status_code=401, detail="Unauthorized Driver PIN")
+
+    title = f"🚐 Van Update: {payload.current_stop}"
+    body = payload.status_message
+
+    success = send_push_notification(title=title, message=body, priority="high", tags="minibus,round_pushpin")
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to broadcast notification")
+        
+    return {"status": "success", "message": "Alert sent successfully to all riders"}
