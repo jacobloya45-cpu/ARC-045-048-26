@@ -210,7 +210,7 @@ async function pollStudentAlert() {
 }
 
 pollStudentAlert();
-window.setInterval(pollStudentAlert, 5000);
+window.setInterval(pollStudentAlert, 8000);
 
 function loadAccessGrants() {
   try {
