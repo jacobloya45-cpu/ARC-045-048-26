@@ -120,3 +120,6 @@ def serve_css():
 @app.get("/app.js")
 def serve_js():
     return FileResponse("app.js")
+    git add .
+git commit -m "Fix 502 startup crash and dependencies"
+git push origin main
