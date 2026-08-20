@@ -220,3 +220,89 @@ async def serve_js():
     if os.path.exists("app.js"):
         return FileResponse("app.js", media_type="application/javascript")
     return FileResponse("index.html")
+import os
+import urllib.request
+import urllib.parse
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# -------------------------------------------------------------
+# CONFIGURATION
+# -------------------------------------------------------------
+NTFY_TOPIC = "arc-van-fortliberty-alerts"  # Topic name for alerts
+DRIVER_PIN = "045048"                     # Driver authorization PIN
+
+def send_push_notification(title: str, message: str) -> bool:
+    """Sends a push notification directly to ntfy.sh"""
+    url = f"https://ntfy.sh/{NTFY_TOPIC}"
+    
+    # HTTP headers (must be ASCII strings)
+    headers = {
+        "Title": title,
+        "Priority": "high",
+        "Tags": "minibus,round_pushpin",
+        "User-Agent": "ARC-Van-Service"
+    }
+    
+    data = message.encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return response.status == 200
+    except Exception as e:
+        print(f"[DEBUG] Push failed: {e}")
+        return False
+
+# -------------------------------------------------------------
+# DATA MODELS
+# -------------------------------------------------------------
+class BroadcastPayload(BaseModel):
+    current_stop: str
+    status_message: str
+
+# -------------------------------------------------------------
+# API ROUTES
+# -------------------------------------------------------------
+@app.get("/healthz")
+async def health_check():
+    return {"status": "healthy"}
+
+@app.post("/api/driver/broadcast")
+async def driver_broadcast(payload: BroadcastPayload, x_driver_pin: str = Header(None)):
+    # Verify driver PIN
+    if x_driver_pin != DRIVER_PIN:
+        raise HTTPException(status_code=401, detail="Invalid Driver PIN")
+
+    title = f"Van Update: {payload.current_stop}"
+    body = payload.status_message
+
+    success = send_push_notification(title=title, message=body)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to deliver alert to ntfy.sh")
+
+    return {"status": "success", "message": f"Broadcast sent for {payload.current_stop}"}
+
+# -------------------------------------------------------------
+# FRONTEND / STATIC FILE ROUTES
+# -------------------------------------------------------------
+@app.get("/")
+async def serve_index():
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"status": "ok", "message": "Server is running"}
+
+@app.get("/style.css")
+async def serve_css():
+    if os.path.exists("style.css"):
+        return FileResponse("style.css", media_type="text/css")
+    return FileResponse("index.html")
+
+@app.get("/app.js")
+async def serve_js():
+    if os.path.exists("app.js"):
+        return FileResponse("app.js", media_type="application/javascript")
+    return FileResponse("index.html")
