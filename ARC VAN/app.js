@@ -368,7 +368,7 @@ renderRequests();
 renderAccessHistory();
 updateDriverControls();
 updateWalkingCount();
-window.setInterval(updateWalkingCount, 5000);
+window.setInterval(updateWalkingCount, 10000);
 if (window.location.hash === '#student-signup') {
   switchView('student');
   document.querySelector('#student-signup').scrollIntoView({ behavior: 'smooth' });
