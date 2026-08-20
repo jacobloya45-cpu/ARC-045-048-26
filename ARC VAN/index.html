@@ -110,3 +110,35 @@
   <script src="app.js"></script>
 </body>
 </html>
+<!-- RIDER SECTION: One-tap subscription link -->
+<div class="card rider-alert-box">
+  <h3>🔔 Get Real-Time Van Alerts</h3>
+  <p>Receive push notifications on your phone when the van is arriving or departing.</p>
+  <a href="https://ntfy.sh/arc-van-fortliberty-alerts" target="_blank" class="btn-subscribe">
+    Tap to Subscribe for Live Alerts
+  </a>
+</div>
+
+<!-- DRIVER SECTION: Broadcast console (visible when PIN is entered) -->
+<div class="card driver-broadcast-box">
+  <h3>📢 Broadcast Van Status</h3>
+  
+  <label for="broadcast-stop">Location / Stop:</label>
+  <select id="broadcast-stop">
+    <option value="Main Gate">Main Gate</option>
+    <option value="Barracks Complex">Barracks Complex</option>
+    <option value="Education Center">Education Center</option>
+    <option value="DFAC / Dining Facility">DFAC / Dining Facility</option>
+  </select>
+
+  <label for="broadcast-status">Status / ETA:</label>
+  <select id="broadcast-status">
+    <option value="Van has arrived and is currently boarding.">Arrived & Boarding</option>
+    <option value="Van is en route. ETA ~5 minutes.">En Route (~5 min ETA)</option>
+    <option value="Departing now for the next stop.">Departing Now</option>
+    <option value="Van is briefly delayed at the gate.">Delayed</option>
+  </select>
+
+  <button id="send-broadcast-btn" onclick="broadcastVanAlert()">Send Alert to All Riders</button>
+  <p id="broadcast-feedback"></p>
+</div>
