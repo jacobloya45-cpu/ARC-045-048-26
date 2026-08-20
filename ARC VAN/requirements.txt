@@ -1,3 +1,6 @@
 fastapi
 uvicorn
 pydantic[email]
+git add .
+git commit -m "Fix 502 startup crash and dependencies"
+git push origin main
