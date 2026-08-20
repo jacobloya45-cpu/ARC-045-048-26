@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arc Van | Campus mobility, in motion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">A</span><span>ARC <em>VAN</em></span></div>
+      <div class="role-switch" aria-label="Choose workspace">
+        <button class="role-btn active" data-view="driver">Driver console</button>
+        <button class="role-btn" data-view="student">Student view</button>
+      </div>
+      <nav class="nav-links" aria-label="Main navigation">
+        <button class="nav-item active" data-view="driver"><span class="nav-icon">◈</span>Operations <span class="nav-count">3</span></button>
+        <button class="nav-item" data-view="student"><span class="nav-icon">↗</span>Van location</button>
+        <button class="nav-item"><span class="nav-icon">◷</span>Route history</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="status-dot"><span></span> Service running</div>
+        <div class="profile"><div class="avatar">JM</div><div><strong>Jordan Miles</strong><small>Driver · Van 02</small></div><span class="more">•••</span></div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div><p class="eyebrow">Wednesday · October 16, 2024</p><h1 id="page-title">Good morning, Jordan <span>✦</span></h1></div>
+        <div class="top-actions"><button class="icon-btn" title="Notifications" aria-label="Notifications">♢<span class="notification-dot"></span></button><button class="help-btn">? <span>Help center</span></button></div>
+      </header>
+
+      <section id="driver-view" class="view active-view">
+        <div class="hero-row"><div><h2>Today's run</h2><p class="muted">Your service snapshot at a glance.</p></div><div class="location-controls"><span class="control-label">ALERT VAN LOCATION</span><div class="location-buttons"><button class="location-btn" data-location="PX">PX</button><button class="location-btn" data-location="Barracks">Barracks</button><button class="location-btn" data-location="Shoppette">Shoppette</button><button class="location-btn" data-location="GYM">GYM</button><button class="location-btn other-btn" data-location="Other">Other</button></div><div class="other-location" id="other-location"><input id="other-location-input" type="text" placeholder="Type a location or message" maxlength="80"><button class="primary-btn" id="send-other-alert">Send alert</button></div></div></div>
+        <div class="stats-grid">
+          <article class="stat-card accent"><div class="stat-head"><span>VAN STATUS</span><span class="live-pill"><i></i> LIVE</span></div><strong>On route</strong><div class="stat-foot"><span class="route-chip">VAN 02</span><span>North Loop</span></div></article>
+          <article class="stat-card"><div class="stat-head"><span>RIDES TODAY</span><span class="stat-icon">↗</span></div><strong>24</strong><div class="stat-foot"><span class="up">↑ 12%</span><span>vs last Wednesday</span></div></article>
+          <article class="stat-card"><div class="stat-head"><span>WAITING</span><span class="stat-icon wait">◷</span></div><strong id="waiting-count">3 <small>students</small></strong><div class="stat-foot"><span>Oldest request</span><span>4 min ago</span></div></article>
+        </div>
+        <div class="content-grid">
+          <section class="panel route-panel"><div class="panel-header"><div><span class="section-kicker">LIVE POSITION</span><h3>Van 02 · North Loop</h3></div><span class="last-updated">Updated just now</span></div><div class="map"><div class="map-grid"></div><div class="road road-a"></div><div class="road road-b"></div><div class="road road-c"></div><div class="location-ping"><span></span><b>VAN 02</b></div><div class="map-label campus">CAMPUS<br><small>NORTH GATE</small></div><div class="map-label library">LIBRARY</div><div class="map-label west">WEST<br>RESIDENCES</div></div><div class="route-meta"><div><span class="meta-label">NEXT STOP</span><strong>North Gate</strong></div><div><span class="meta-label">ARRIVAL</span><strong>~ 6 min</strong></div><div><span class="meta-label">CAPACITY</span><strong>8 / 12 seats</strong></div></div></section>
+          <section class="panel requests-panel"><div class="panel-header"><div><span class="section-kicker">INCOMING</span><h3>Ride requests <span class="request-badge" id="request-badge">3</span></h3></div><button class="text-btn">View all <span>→</span></button></div><div id="request-list" class="request-list"></div><button class="secondary-btn full-width" id="announce-btn">＋ Send boarding update</button><div class="departure-alert"><div class="departure-header"><div><span class="meta-label">DEPARTURE ALERT</span><strong>When should students expect departure?</strong></div><span id="departure-time" class="departure-time">5 min</span></div><div class="departure-options" role="group" aria-label="Departure wait time"><button class="departure-option active" type="button" data-wait="5">5 min</button><button class="departure-option" type="button" data-wait="10">10 min</button><button class="departure-option" type="button" data-wait="15">15 min</button><button class="departure-option" type="button" data-wait="20">20 min</button><button class="departure-option" type="button" data-wait="30">30 min</button></div><button class="primary-btn full-width" id="departure-alert-btn" type="button">Alert students</button></div><div class="availability-alert"><span class="meta-label">RIDE AVAILABILITY</span><div class="availability-buttons"><button class="availability-btn returning" id="van-full-return-btn" type="button">Van is full, I’ll be back</button><button class="availability-btn unavailable" id="no-rides-btn" type="button">Van is full, no rides at this time</button></div></div></section>
+        </div>
+        <section class="panel access-panel">
+          <div class="panel-header">
+            <div><span class="section-kicker">DRIVER ACCESS</span><h3>Share Van 02 access</h3></div>
+            <span class="access-scope">FULL CONSOLE</span>
+          </div>
+          <p class="access-description">Give another driver access to operations, live location, requests, and service updates.</p>
+          <form id="access-form" class="access-form" novalidate>
+            <label><span>Driver name</span><input id="driver-name" name="name" type="text" autocomplete="name" placeholder="e.g. Avery Lee" required></label>
+            <label><span>Driver email</span><input id="driver-email" name="email" type="email" autocomplete="email" placeholder="driver@unit.mil" required></label>
+            <button class="primary-btn" type="submit">Grant access</button>
+          </form>
+          <p id="access-form-message" class="form-message" role="status" aria-live="polite"></p>
+          <div class="access-history-header"><span class="meta-label">ACCESS HISTORY</span><span id="access-count" class="access-count">0 grants</span></div>
+          <div id="access-history" class="access-history"></div>
+        </section>
+        <section class="panel qr-panel">
+          <div class="qr-copy"><span class="section-kicker">STUDENT SIGNUP</span><h3>Let students scan to get alerts</h3><p>Post this code in the van so students can sign up for Van 02 departure and location updates.</p><span class="qr-url" id="qr-url">Student alert signup</span></div>
+          <div class="qr-code-wrap"><img id="student-signup-qr" width="156" height="156" alt="QR code for student alert signup"><span>Scan to sign up</span></div>
+        </section>
+      </section>
+
+      <section id="student-view" class="view">
+        <div class="student-hero"><div><span class="section-kicker">STUDENT ACCESS</span><h2>Know where your van is.</h2><p>Follow the live route and watch for the driver's location alerts.</p></div><div class="student-orbit"><span>ARC<br><b>VAN</b></span></div></div>
+        <div class="student-grid"><section class="panel student-status-panel student-location-panel"><div class="panel-header"><div><span class="section-kicker">LIVE SERVICE</span><h3>Van 02 is moving</h3></div><span class="live-pill"><i></i> LIVE</span></div><div class="mini-map"><div class="mini-route"></div><div class="mini-van">02</div><span class="stop s1">North Gate</span><span class="stop s2">Library</span><span class="stop s3">You are here</span></div><div class="eta-block"><div><span class="meta-label">NEXT ARRIVAL</span><strong>North Gate</strong></div><b>6 min</b></div><div class="service-note"><span>✦</span><p><strong>Location sharing is on</strong><br>The driver will alert students when the van reaches a stop.</p><button class="student-alert-btn" id="student-close-alert">I’m close by <span>↗</span></button></div></section><section class="panel alert-panel"><div class="panel-header"><div><span class="section-kicker">DRIVER UPDATES</span><h3>Latest location alert</h3></div><span id="student-alert-time" class="alert-time">Just now</span></div><div class="alert-callout"><span>⌁</span><div><strong id="student-alert-title">Van 02 is approaching North Gate</strong><p id="student-alert-detail">Expect arrival in about 6 minutes.</p></div></div><div class="alert-history"><span class="meta-label">RECENT STOPS</span><p><b>Library entrance</b><small>Departed 8 min ago</small></p><p><b>West Residences</b><small>Departed 16 min ago</small></p></div></section></div>
+        <section id="student-signup" class="panel signup-panel"><div><span class="section-kicker">GET VAN ALERTS</span><h3>Stay in the loop</h3><p class="muted">Sign up for Van 02 departure and location alerts.</p></div><form id="student-signup-form" class="signup-form" novalidate><label><span>Your name</span><input name="name" type="text" autocomplete="name" placeholder="e.g. Sam Carter" required></label><label><span>Email address</span><input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label><button class="primary-btn" type="submit">Sign up for alerts</button></form><p id="signup-message" class="form-message" role="status" aria-live="polite"></p></section>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
