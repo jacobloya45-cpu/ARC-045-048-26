@@ -373,3 +373,39 @@ if (window.location.hash === '#student-signup') {
   switchView('student');
   document.querySelector('#student-signup').scrollIntoView({ behavior: 'smooth' });
 }
+async function broadcastVanAlert() {
+  const currentStop = document.getElementById("broadcast-stop").value;
+  const statusMessage = document.getElementById("broadcast-status").value;
+  const feedback = document.getElementById("broadcast-feedback");
+  const driverPin = sessionStorage.getItem("driverPin") || "045048";
+
+  feedback.innerText = "Broadcasting alert...";
+  feedback.style.color = "#555";
+
+  try {
+    const response = await fetch("/api/driver/broadcast", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Driver-PIN": driverPin
+      },
+      body: JSON.stringify({
+        current_stop: currentStop,
+        status_message: statusMessage
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      feedback.innerText = " Alert successfully broadcasted!";
+      feedback.style.color = "green";
+    } else {
+      feedback.innerText = `Error: ${data.detail || "Failed to send"}`;
+      feedback.style.color = "red";
+    }
+  } catch (error) {
+    feedback.innerText = "Network error connecting to server.";
+    feedback.style.color = "red";
+  }
+}
