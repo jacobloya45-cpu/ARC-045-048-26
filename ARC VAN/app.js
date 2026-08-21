@@ -28,6 +28,7 @@ const driverPinKey = 'arc-van-driver-token';
 let currentVanLocation = '';
 let studentSelectedPickup = '';
 let socket = null;
+let heartbeatTimer = null;
 
 function initQRCodes() {
   const currentUrl = window.location.origin;
@@ -103,19 +104,32 @@ function playAlertTone() {
   } catch (e) {}
 }
 
+// Resilient Native WebSocket with Active 15-second Heartbeat Keep-Alive
 function initWebSocket() {
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws/alerts`;
 
   socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
-    console.log('✅ Connected to Native WebSocket Alerts');
+    console.log('✅ Realtime WebSocket Connected');
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'PING' }));
+      }
+    }, 15000);
   };
 
   socket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      if (data.type === 'PONG') return;
+
       if (data.type === 'NEW_ALERT') {
         renderReceivedAlert(data.alert);
       } else if (data.type === 'REQUESTS_UPDATED') {
@@ -128,15 +142,21 @@ function initWebSocket() {
           showToast(`🚶 Incoming: ${data.new_name} is walking to the van!`);
         }
       } else if (data.type === 'NEW_RIDE_REQUEST') {
-        showToast(`🚖 New Ride Request: ${data.name} (${data.pickup} → ${data.dropoff})`);
+        playAlertTone();
+        showToast(`🚖 New Ride: ${data.name} (${data.pickup} → ${data.dropoff})`);
       }
     } catch (err) {
-      console.error('Socket message parse error', err);
+      console.error('Socket parse error', err);
     }
   };
 
   socket.onclose = () => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
     setTimeout(initWebSocket, 2000);
+  };
+
+  socket.onerror = () => {
+    try { socket.close(); } catch (e) {}
   };
 }
 
@@ -168,6 +188,7 @@ window.addEventListener('load', () => {
   updateDriverControls();
   initWebSocket();
   initQRCodes();
+  syncInitialData();
 
   document.querySelectorAll('[data-view]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -175,7 +196,7 @@ window.addEventListener('load', () => {
         showPinModal('Enter Driver PIN to unlock console');
       } else {
         switchView(button.dataset.view);
-        if (button.dataset.view === 'driver') pollDriverRequests();
+        if (button.dataset.view === 'driver') syncInitialData();
       }
     });
   });
@@ -199,7 +220,7 @@ window.addEventListener('load', () => {
           hidePinModal();
           updateDriverControls();
           switchView('driver');
-          pollDriverRequests();
+          syncInitialData();
           showToast('Driver console unlocked');
         } else {
           errBox.textContent = 'Invalid PIN. Access denied.';
@@ -420,7 +441,7 @@ function submitStudentRideRequest(pickup, dropoff) {
     body: JSON.stringify({ name: name, pickup: pickup, dropoff: dropoff })
   })
   .then((res) => res.json())
-  .then((data) => {
+  .then(() => {
     showToast(`🚖 Ride Requested: Pickup at ${pickup} → ${dropoff}`);
     studentSelectedPickup = '';
     const dropoffSection = document.querySelector('#student-dropoff-step');
@@ -506,7 +527,6 @@ if (sendCustomRideBtn) {
   });
 }
 
-// Student Notification when walking to van
 if (headingToVanForm) {
   headingToVanForm.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -524,7 +544,6 @@ if (headingToVanForm) {
   });
 }
 
-// Clear all walkers button action
 if (clearAllWalkersBtn) {
   clearAllWalkersBtn.addEventListener('click', () => {
     if (!isDriverAuthenticated()) return;
@@ -554,7 +573,6 @@ function switchView(view) {
   }
 }
 
-// Render Incoming Walkers Manifest on Driver Console
 function renderDriverWalkers(walkers) {
   if (!driverWalkerList) return;
   if (!walkers || !walkers.length) {
@@ -617,31 +635,29 @@ function renderDriverRequests(requests) {
   });
 }
 
-function pollDriverRequests() {
-  if (!isDriverAuthenticated()) return;
-  fetch('/api/driver/requests', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: getStoredDriverPin() }),
-    cache: 'no-store'
-  })
-  .then((res) => res.json())
-  .then((data) => {
-    renderDriverRequests(data.requests || []);
-    renderDriverWalkers(data.walkers || []);
-    if (walkingCount && data.walkers) {
-      walkingCount.innerHTML = `${data.walkers.length} <small>students</small>`;
-    }
-  })
-  .catch(() => {});
+function syncInitialData() {
+  fetch('/api/status', { cache: 'no-store' })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.manifest) renderDriverRequests(data.manifest);
+      if (data.walkers) renderDriverWalkers(data.walkers);
+      if (data.walking_count !== undefined && walkingCount) {
+        walkingCount.innerHTML = `${data.walking_count} <small>students</small>`;
+      }
+    })
+    .catch(() => {});
+
+  fetch('/api/alerts/latest', { cache: 'no-store' })
+    .then((res) => res.json())
+    .then((alert) => {
+      if (alert && alert.id) {
+        if (studentAlertTitle) studentAlertTitle.textContent = displayVanName(alert.title);
+        if (studentAlertDetail) studentAlertDetail.textContent = displayVanName(alert.detail);
+        if (studentAlertTime) studentAlertTime.textContent = 'Active';
+      }
+    })
+    .catch(() => {});
 }
 
-fetch('/api/status', { cache: 'no-store' })
-  .then((res) => res.json())
-  .then((data) => {
-    if (data.walking_count !== undefined && walkingCount) {
-      walkingCount.innerHTML = `${data.walking_count} <small>students</small>`;
-    }
-    if (data.walkers) renderDriverWalkers(data.walkers);
-  })
-  .catch(() => {});
+// Background poll fallback every 4 seconds to guarantee sync even across proxy resets
+setInterval(syncInitialData, 4000);
