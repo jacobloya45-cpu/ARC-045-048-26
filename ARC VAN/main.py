@@ -118,8 +118,12 @@ def get_poc():
 async def set_poc(payload: DriverPOCPayload):
     if payload.pin != DRIVER_PIN:
         raise HTTPException(status_code=403, detail="Invalid Driver PIN")
-    database.save_driver_poc(payload.driver_name.strip(), payload.contact_info.strip())
+    
+    d_name = (payload.driver_name or "").strip()
+    c_info = (payload.contact_info or "").strip()
+    database.save_driver_poc(d_name, c_info)
     poc_data = database.get_driver_poc()
+    
     await manager.broadcast({
         "type": "POC_UPDATED",
         "poc": poc_data
@@ -242,7 +246,7 @@ async def heading_to_van(signup: AlertSignup):
     conn.commit()
     cursor.execute("SELECT id FROM users WHERE email = ?", (signup.email.lower(),))
     user_id = cursor.fetchone()[0]
-    cursor.execute("INSERT INTO walking_to_van (user_id) VALUES (?, CURRENT_TIMESTAMP)", (user_id,))
+    cursor.execute("INSERT INTO walking_to_van (user_id) VALUES (?)", (user_id,))
     conn.commit()
     conn.close()
 
