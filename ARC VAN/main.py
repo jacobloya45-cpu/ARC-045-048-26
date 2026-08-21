@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import json
-import asyncio
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -16,7 +15,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
-# --- Native WebSocket Manager with Safe Broadcast ---
+# --- Native WebSocket Connection Manager ---
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -45,6 +44,11 @@ manager = ConnectionManager()
 # --- Pydantic Data Models ---
 class PinVerifyPayload(BaseModel):
     pin: str
+
+class DriverPOCPayload(BaseModel):
+    pin: str
+    driver_name: str | None = ""
+    contact_info: str | None = ""
 
 class AlertPayload(BaseModel):
     pin: str
@@ -81,7 +85,6 @@ class UpdateStatus(BaseModel):
 class DriverRequestQuery(BaseModel):
     pin: str
 
-# --- WebSocket Endpoint with Heartbeat Listener ---
 @app.websocket("/ws/alerts")
 async def websocket_alerts_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
@@ -107,6 +110,22 @@ def verify_driver_pin(payload: PinVerifyPayload):
         return {"success": True, "token": "driver-authenticated-session"}
     raise HTTPException(status_code=401, detail="Invalid PIN")
 
+@app.get("/api/driver/poc")
+def get_poc():
+    return database.get_driver_poc()
+
+@app.post("/api/driver/poc")
+async def set_poc(payload: DriverPOCPayload):
+    if payload.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
+    database.save_driver_poc(payload.driver_name.strip(), payload.contact_info.strip())
+    poc_data = database.get_driver_poc()
+    await manager.broadcast({
+        "type": "POC_UPDATED",
+        "poc": poc_data
+    })
+    return {"success": True, "poc": poc_data}
+
 @app.get("/api/alerts/latest")
 def latest_alert():
     return database.get_latest_alert() or {"id": 0, "title": "No new alerts", "detail": "", "location": None, "created_at": ""}
@@ -116,6 +135,7 @@ def get_status():
     status = database.get_queue_data()
     status["walkers"] = database.get_walking_list()
     status["walking_count"] = len(status["walkers"])
+    status["poc"] = database.get_driver_poc()
     return status
 
 @app.post("/api/driver/broadcast")
@@ -149,7 +169,8 @@ def driver_requests(payload: DriverRequestQuery):
         raise HTTPException(status_code=403, detail="Invalid Driver PIN")
     return {
         "requests": database.get_queue_data()["manifest"],
-        "walkers": database.get_walking_list()
+        "walkers": database.get_walking_list(),
+        "poc": database.get_driver_poc()
     }
 
 @app.post("/api/driver/complete-request")
@@ -221,7 +242,7 @@ async def heading_to_van(signup: AlertSignup):
     conn.commit()
     cursor.execute("SELECT id FROM users WHERE email = ?", (signup.email.lower(),))
     user_id = cursor.fetchone()[0]
-    cursor.execute("INSERT INTO walking_to_van (user_id) VALUES (?)", (user_id,))
+    cursor.execute("INSERT INTO walking_to_van (user_id) VALUES (?, CURRENT_TIMESTAMP)", (user_id,))
     conn.commit()
     conn.close()
 
