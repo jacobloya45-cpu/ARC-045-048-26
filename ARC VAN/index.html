@@ -14,80 +14,229 @@
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">A</span><span>ARC <em>VAN</em></span></div>
       <div class="role-switch" aria-label="Choose workspace">
-        <button class="role-btn active" data-view="driver">Driver console</button>
-        <button class="role-btn" data-view="student">Student view</button>
+        <button class="role-btn" data-view="driver">Driver console</button>
+        <button class="role-btn active" data-view="student">Student view</button>
       </div>
       <nav class="nav-links" aria-label="Main navigation">
-        <button class="nav-item active" data-view="driver"><span class="nav-icon">◈</span>Operations <span class="nav-count">3</span></button>
-        <button class="nav-item" data-view="student"><span class="nav-icon">↗</span>Student alerts</button>
-        <button class="nav-item"><span class="nav-icon">◷</span>Route history</button>
+        <button class="nav-item" data-view="driver"><span class="nav-icon">◈</span>Operations</button>
+        <button class="nav-item active" data-view="student"><span class="nav-icon">↗</span>Student alerts</button>
       </nav>
       <div class="sidebar-footer">
-        <div class="status-dot"><span></span> Service running</div>
-        <div class="profile"><div class="avatar">JM</div><div><strong>Jordan Miles</strong><small>Driver · 045/048 Van</small></div><span class="more">•••</span></div>
+        <div class="status-dot"><span></span> Native Live Feed Active</div>
+        <div class="profile"><div class="avatar">JM</div><div><strong>Jordan Miles</strong><small>Driver · 045/048 Van</small></div></div>
       </div>
     </aside>
 
     <main class="main-content">
       <header class="topbar">
-        <div><p class="eyebrow">Wednesday · October 16, 2024</p><h1 id="page-title">Monitor the App and be Accurate <span>✦</span></h1></div>
-        <div class="top-actions"><button class="icon-btn" title="Notifications" aria-label="Notifications">♢<span class="notification-dot"></span></button><button class="help-btn">? <span>Help center</span></button></div>
+        <div><p class="eyebrow">Service Active</p><h1 id="page-title">Your ride, on your time <span>✦</span></h1></div>
       </header>
 
-      <section id="driver-view" class="view active-view">
-        <div class="hero-row"><div><h2>Today's run</h2><p class="muted">Your service snapshot at a glance.</p></div><div class="location-controls"><span class="control-label">ALERT VAN LOCATION</span><span id="location-prompt" class="location-prompt">Step 1: Choose where the Van is now.</span><div class="location-buttons"><button class="location-btn" data-location="PX">PX</button><button class="location-btn" data-location="Barracks">Barracks</button><button class="location-btn" data-location="Shoppette">Shoppette</button><button class="location-btn" data-location="GYM">GYM</button><button class="location-btn other-btn" data-location="Other">Other</button></div><div class="other-location" id="other-location"><input id="other-location-input" type="text" placeholder="Enter where the Van is now" maxlength="80"><button class="primary-btn" id="send-other-alert">Set current location</button></div><div id="destination-controls" class="destination-controls"><span class="control-label">THE VAN IS GOING TO</span><div class="location-buttons"><button class="destination-btn" data-location="PX">PX</button><button class="destination-btn" data-location="Barracks">Barracks</button><button class="destination-btn" data-location="Shoppette">Shoppette</button><button class="destination-btn" data-location="GYM">GYM</button><button class="destination-btn other-btn" data-location="Other">Other</button></div><div class="other-location" id="other-destination"><input id="other-destination-input" type="text" placeholder="Enter the destination" maxlength="80"><button class="primary-btn" id="send-destination-other">Send alert</button></div></div></div></div>
-        <div class="stats-grid">
-          <article class="stat-card accent"><div class="stat-head"><span>VAN STATUS</span><span class="live-pill"><i></i> LIVE</span></div><strong>On route</strong><div class="stat-foot"><span class="route-chip">045/048 VAN</span><span>North Loop</span></div></article>
-          <article class="stat-card"><div class="stat-head"><span>RIDES TODAY</span><span class="stat-icon">↗</span></div><strong>24</strong><div class="stat-foot"><span class="up">↑ 12%</span><span>vs last Wednesday</span></div></article>
-          <article class="stat-card"><div class="stat-head"><span>WAITING</span><span class="stat-icon wait">◷</span></div><strong id="waiting-count">3 <small>students</small></strong><div class="stat-foot"><span>Oldest request</span><span>4 min ago</span></div></article>
-          <article class="stat-card"><div class="stat-head"><span>HEADING TO VAN</span><span class="stat-icon">→</span></div><strong id="walking-count">0 <small>students</small></strong><div class="stat-foot"><span>On their way</span><span>Incoming arrivals</span></div></article>
-        </div>
-        <div class="content-grid">
-          <section class="panel requests-panel"><div class="departure-alert"><div class="departure-header"><div><span class="meta-label">DEPARTURE ALERT</span><strong>When should students expect departure?</strong></div><span id="departure-time" class="departure-time">5 min</span></div><div class="departure-options" role="group" aria-label="Departure wait time"><button class="departure-option active" type="button" data-wait="5">5 min</button><button class="departure-option" type="button" data-wait="10">10 min</button><button class="departure-option" type="button" data-wait="15">15 min</button><button class="departure-option" type="button" data-wait="20">20 min</button><button class="departure-option" type="button" data-wait="30">30 min</button></div><button class="primary-btn full-width" id="departure-alert-btn" type="button">Alert students</button></div><div class="availability-alert"><span class="meta-label">RIDE AVAILABILITY</span><div class="availability-buttons"><button class="availability-btn returning" id="van-full-return-btn" type="button">Van is full, I’ll be back</button><button class="availability-btn unavailable" id="no-rides-btn" type="button">Van is full, no rides at this time</button></div></div></section>
-        </div>
-        <section class="panel access-panel">
-          <div class="panel-header">
-            <div><span class="section-kicker">DRIVER ACCESS</span><h3>Share 045/048 Van access</h3></div>
-            <span class="access-scope">FULL CONSOLE</span>
+      <!-- DRIVER VIEW -->
+      <section id="driver-view" class="view">
+        <div class="hero-row">
+          <div><h2>Today's run</h2><p class="muted">Your service snapshot at a glance.</p></div>
+          <div class="location-controls">
+            <span class="control-label">ALERT VAN LOCATION</span>
+            <span id="location-prompt" class="location-prompt">Step 1: Choose where the Van is now.</span>
+            <div class="location-buttons">
+              <button class="location-btn" data-location="PX">PX</button>
+              <button class="location-btn" data-location="Barracks">Barracks</button>
+              <button class="location-btn" data-location="Shoppette">Shoppette</button>
+              <button class="location-btn" data-location="GYM">GYM</button>
+              <button class="location-btn other-btn" data-location="Other">Other</button>
+            </div>
+            <div class="other-location" id="other-location">
+              <input id="other-location-input" type="text" placeholder="Enter where the Van is now" maxlength="80">
+              <button class="primary-btn" id="send-other-alert">Set current location</button>
+            </div>
+            <div id="destination-controls" class="destination-controls">
+              <span class="control-label">THE VAN IS GOING TO</span>
+              <div class="location-buttons">
+                <button class="destination-btn" data-location="PX">PX</button>
+                <button class="destination-btn" data-location="Barracks">Barracks</button>
+                <button class="destination-btn" data-location="Shoppette">Shoppette</button>
+                <button class="destination-btn" data-location="GYM">GYM</button>
+                <button class="destination-btn other-btn" data-location="Other">Other</button>
+              </div>
+              <div class="other-location" id="other-destination">
+                <input id="other-destination-input" type="text" placeholder="Enter the destination" maxlength="80">
+                <button class="primary-btn" id="send-destination-other">Send alert</button>
+              </div>
+            </div>
           </div>
-          <p class="access-description">Give another driver access to operations, requests, and service updates.</p>
-          <form id="access-form" class="access-form" novalidate>
-            <label><span>Driver name</span><input id="driver-name" name="name" type="text" autocomplete="name" placeholder="e.g. Avery Lee" required></label>
-            <label><span>Driver email</span><input id="driver-email" name="email" type="email" autocomplete="email" placeholder="driver@unit.mil" required></label>
-            <button class="primary-btn" type="submit">Grant access</button>
-          </form>
-          <p id="access-form-message" class="form-message" role="status" aria-live="polite"></p>
-          <div class="access-history-header"><span class="meta-label">ACCESS HISTORY</span><span id="access-count" class="access-count">0 grants</span></div>
-          <div id="access-history" class="access-history"></div>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat-card accent"><div class="stat-head"><span>VAN STATUS</span><span class="live-pill"><i></i> LIVE</span></div><strong>On route</strong><div class="stat-foot"><span class="route-chip">045/048 VAN</span><span>Fort Knox Loop</span></div></article>
+          <article class="stat-card"><div class="stat-head"><span>RIDES TODAY</span><span class="stat-icon">↗</span></div><strong>Active</strong><div class="stat-foot"><span class="up">↑ Live</span><span>Direct Socket</span></div></article>
+          <article class="stat-card"><div class="stat-head"><span>HEADING TO VAN</span><span class="stat-icon">→</span></div><strong id="walking-count">0 <small>students</small></strong><div class="stat-foot"><span>Incoming arrivals</span></div></article>
+        </div>
+
+        <!-- LIVE HEADING TO VAN MANIFEST -->
+        <section class="panel driver-requests-panel" style="border-left: 4px solid var(--coral); margin-bottom: 20px;">
+          <div class="panel-header">
+            <div>
+              <span class="section-kicker" style="color: var(--coral);">INCOMING ARRIVALS</span>
+              <h3>Students Heading to the Van</h3>
+            </div>
+            <button class="secondary-btn" id="clear-all-walkers-btn" style="padding: 6px 12px; font-size: 11px;">Clear All Walkers</button>
+          </div>
+          <div id="driver-walker-list" class="driver-request-list">
+            <p class="access-empty">No students currently walking to the van.</p>
+          </div>
         </section>
-        <section class="panel qr-panel">
-          <div class="qr-copy"><span class="section-kicker">STUDENT SIGNUP</span><h3>Let students scan to get alerts</h3><p>Post this code in the van so students can sign up for 045/048 Van departure and service updates.</p><span class="qr-url" id="qr-url">Student alert signup</span></div>
-          <div class="qr-code-wrap"><img id="student-signup-qr" width="156" height="156" alt="QR code for student alert signup"><span>Scan to sign up</span></div>
+
+        <!-- STUDENT PICKUP REQUESTS MANIFEST -->
+        <section class="panel driver-requests-panel">
+          <div class="panel-header"><div><span class="section-kicker">STUDENT REQUESTS</span><h3>Pickup locations</h3></div></div>
+          <div id="driver-request-list" class="driver-request-list"><p class="access-empty">No student pickup requests yet.</p></div>
+        </section>
+
+        <div class="content-grid" style="margin-top:20px;">
+          <section class="panel requests-panel">
+            <div class="departure-alert">
+              <div class="departure-header"><div><span class="meta-label">DEPARTURE ALERT</span><strong>When should students expect departure?</strong></div><span id="departure-time" class="departure-time">5 min</span></div>
+              <div class="departure-options" role="group" aria-label="Departure wait time">
+                <button class="departure-option active" type="button" data-wait="5">5 min</button>
+                <button class="departure-option" type="button" data-wait="10">10 min</button>
+                <button class="departure-option" type="button" data-wait="15">15 min</button>
+                <button class="departure-option" type="button" data-wait="20">20 min</button>
+                <button class="departure-option" type="button" data-wait="30">30 min</button>
+              </div>
+              <button class="primary-btn full-width" id="departure-alert-btn" type="button">Alert students</button>
+            </div>
+            <div class="availability-alert">
+              <span class="meta-label">RIDE AVAILABILITY</span>
+              <div class="availability-buttons">
+                <button class="availability-btn returning" id="van-full-return-btn" type="button">Van is full, I’ll be back</button>
+                <button class="availability-btn unavailable" id="no-rides-btn" type="button">Van is full, no rides at this time</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel qr-panel" style="margin-top: 24px;">
+          <div class="qr-copy">
+            <span class="section-kicker">PASSENGER ACCESS</span>
+            <h3>Share Shuttle App</h3>
+            <p>Have riders scan this QR code to access live tracking and request rides from their phones.</p>
+            <span class="qr-url driver-qr-url">Loading link...</span>
+          </div>
+          <div class="qr-code-wrap">
+            <img id="driver-app-qr" width="156" height="156" alt="QR code for ARC Van App">
+            <span>Scan to open App</span>
+          </div>
         </section>
       </section>
 
-      <section id="student-view" class="view">
-        <div class="student-hero"><div><span class="section-kicker">STUDENT ALERTS</span><h2>Stay ready for your ride.</h2><p>Get departure and service updates directly from the driver.</p></div><div class="student-orbit-wrap"><div class="student-orbit"><span>ARC<br><b>VAN</b></span></div><div class="van-location-marker" aria-live="polite"><span class="location-pulse"></span><div><small>045/048 VAN LOCATION</small><strong id="student-van-location">Waiting for driver</strong><time id="student-van-location-time">Not updated</time></div></div></div></div>
-        <div class="student-grid"><section class="panel alert-panel"><div class="panel-header"><div><span class="section-kicker">DRIVER UPDATES</span><h3>Latest van alert</h3></div><div class="alert-meta"><span class="monitor-status"><i></i> MONITORING UPDATES</span><span id="student-alert-time" class="alert-time">Just now</span></div></div><div class="alert-callout"><span>⌁</span><div class="student-alert-columns"><div class="location-alert-column"><strong id="student-alert-title">No new van alerts</strong><p id="student-alert-detail">Departure and service updates will appear here.</p></div><div class="departure-column"><span class="meta-label">DEPARTURE TIME</span><strong id="student-departure-time">No departure set</strong></div></div></div><div class="alert-history"><span class="meta-label">RECENT UPDATES</span><p><b>Service updates</b><small>Watch here for driver alerts</small></p><p><b>Departure notices</b><small>Shared by the driver</small></p></div></section><section class="panel heading-panel"><div class="panel-header"><div><span class="section-kicker">NOTIFY DRIVER</span><h3>I'm heading to the Van</h3></div></div><p class="muted">Let the driver know you're on your way.</p><form id="heading-to-van-form" class="heading-form" novalidate><label><span>Your name</span><input name="name" type="text" autocomplete="name" placeholder="e.g. Sam Carter" required></label><label><span>Email address</span><input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label><button class="primary-btn" type="submit">I'm heading to the Van</button></form><p id="heading-message" class="form-message" role="status" aria-live="polite"></p></section></div>
-        <section id="student-signup" class="panel signup-panel"><div><span class="section-kicker">GET VAN ALERTS</span><h3>Stay in the loop</h3><p class="muted">Sign up for 045/048 Van departure and location alerts.</p></div><form id="student-signup-form" class="signup-form" novalidate><label><span>Your name</span><input name="name" type="text" autocomplete="name" placeholder="e.g. Sam Carter" required></label><label><span>Email address</span><input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label><button class="primary-btn" type="submit">Sign up for alerts</button></form><p id="signup-message" class="form-message" role="status" aria-live="polite"></p></section>
+      <!-- STUDENT VIEW -->
+      <section id="student-view" class="view active-view">
+        <div class="student-hero">
+          <div><span class="section-kicker">STUDENT ALERTS</span><h2>Stay ready for your ride.</h2><p>Get departure and service updates directly from the driver.</p></div>
+          <div class="student-orbit-wrap"><div class="student-orbit"><span>ARC<br><b>VAN</b></span></div></div>
+        </div>
+
+        <div class="student-grid">
+          <section class="panel alert-panel">
+            <div class="panel-header">
+              <div><span class="section-kicker">DRIVER UPDATES</span><h3>Latest van alert</h3></div>
+              <div class="alert-meta"><span class="monitor-status"><i></i> LIVE WEBSOCKET</span><span id="student-alert-time" class="alert-time">Just now</span></div>
+            </div>
+            <div class="alert-callout">
+              <span>⌁</span>
+              <div class="student-alert-columns">
+                <div class="location-alert-column">
+                  <strong id="student-alert-title">045/048 Van Ready</strong>
+                  <p id="student-alert-detail">Live driver location updates will display here.</p>
+                </div>
+                <div class="departure-column">
+                  <span class="meta-label">DEPARTURE TIME</span>
+                  <strong id="student-departure-time">En Route</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel heading-panel">
+            <div class="panel-header"><div><span class="section-kicker">NOTIFY DRIVER</span><h3>I'm heading to the Van</h3></div></div>
+            <p class="muted">Let the driver know you're walking to the pickup spot now.</p>
+            <form id="heading-to-van-form" class="heading-form">
+              <label><span>Your name</span><input name="name" type="text" placeholder="e.g. PVT Smith" required></label>
+              <label><span>Email or Unit</span><input name="email" type="text" placeholder="e.g. B Co / smith@mail.mil" required></label>
+              <button class="primary-btn" type="submit">I'm heading to the Van</button>
+            </form>
+          </section>
+        </div>
+
+        <section class="panel ride-request-panel" style="margin-top: 24px;">
+          <div class="panel-header">
+            <div>
+              <span class="section-kicker">QUICK RIDE REQUEST</span>
+              <h3>Request a pickup</h3>
+            </div>
+          </div>
+          
+          <div class="student-request-console">
+            <div class="student-name-box">
+              <label for="student-rider-name"><strong>Your Name:</strong></label>
+              <input id="student-rider-name" type="text" placeholder="Enter your name (e.g., PVT Smith)" maxlength="50" style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; width: 100%; max-width: 320px; font-size: 14px; margin-top: 6px;">
+            </div>
+
+            <div style="margin-top: 18px;">
+              <span class="control-label" style="display:block; margin-bottom: 6px; font-size: 11px;">STEP 1: WHERE ARE YOU NOW? (PICKUP)</span>
+              <div class="location-buttons">
+                <button class="location-btn student-req-pickup-btn" data-loc="PX">PX</button>
+                <button class="location-btn student-req-pickup-btn" data-loc="Barracks">Barracks</button>
+                <button class="location-btn student-req-pickup-btn" data-loc="Shoppette">Shoppette</button>
+                <button class="location-btn student-req-pickup-btn" data-loc="GYM">GYM</button>
+                <button class="location-btn other-btn student-req-pickup-btn" data-loc="Other">Other</button>
+              </div>
+              <div class="other-location" id="student-other-pickup-box" style="margin-top: 8px;">
+                <input id="student-other-pickup-input" type="text" placeholder="Enter custom pickup stop" maxlength="80">
+                <button class="primary-btn" id="student-set-other-pickup">Set Pickup</button>
+              </div>
+            </div>
+
+            <div id="student-dropoff-step" class="destination-controls" style="margin-top: 18px;">
+              <span class="control-label" style="display:block; margin-bottom: 6px; font-size: 11px;" id="student-dropoff-prompt">STEP 2: WHERE DO YOU NEED TO GO? (DROPOFF)</span>
+              <div class="location-buttons">
+                <button class="destination-btn student-req-dropoff-btn" data-loc="PX">PX</button>
+                <button class="destination-btn student-req-dropoff-btn" data-loc="Barracks">Barracks</button>
+                <button class="destination-btn student-req-dropoff-btn" data-loc="Shoppette">Shoppette</button>
+                <button class="destination-btn student-req-dropoff-btn" data-loc="GYM">GYM</button>
+                <button class="destination-btn other-btn student-req-dropoff-btn" data-loc="Other">Other</button>
+              </div>
+              <div class="other-location" id="student-other-dropoff-box" style="margin-top: 8px;">
+                <input id="student-other-dropoff-input" type="text" placeholder="Enter custom destination" maxlength="80">
+                <button class="primary-btn" id="student-send-custom-ride">Submit Ride Request</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel qr-panel" style="margin-top: 24px;">
+          <div class="qr-copy">
+            <span class="section-kicker">SHARE THE RIDE</span>
+            <h3>Share Shuttle Tracker</h3>
+            <p>Have a battle buddy scan this code to track the van and request rides directly from their mobile browser.</p>
+            <span class="qr-url student-qr-url">Loading link...</span>
+          </div>
+          <div class="qr-code-wrap">
+            <img id="student-app-qr" width="156" height="156" alt="QR code for ARC Van App">
+            <span>Scan for App</span>
+          </div>
+        </section>
       </section>
     </main>
   </div>
-  <div id="toast" class="toast" role="status"></div>
-  <footer class="app-footer">
-    <div class="footer-content">
-      <p><strong>Made by SSG Loya</strong></p>
-      <p>report issues to me.</p>
-    </div>
-  </footer>
 
-  <!-- Driver PIN modal (requires PIN to unlock driver controls) -->
   <div id="driver-pin-modal" class="pin-modal" aria-hidden="true" role="dialog" aria-label="Driver PIN">
     <div class="pin-modal-backdrop"></div>
     <div class="pin-modal-content">
-      <h3>Driver console locked</h3>
-      <p class="muted">Enter the driver PIN to unlock driver controls.</p>
-      <input type="password" inputmode="numeric" pattern="\d*" maxlength="6" aria-label="Driver PIN" class="pin-input">
+      <h3>Driver Console Locked</h3>
+      <p class="muted">Enter authorized driver PIN to access console.</p>
+      <input type="password" inputmode="numeric" pattern="\d*" maxlength="6" aria-label="Driver PIN" class="pin-input" placeholder="••••••">
       <div class="pin-error" aria-live="polite"></div>
       <div class="pin-actions">
         <button class="secondary-btn pin-cancel" type="button">Cancel</button>
@@ -97,15 +246,24 @@
     <style>
       .pin-modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1200; }
       .pin-modal.visible { display:flex; }
-      .pin-modal-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.45); }
-      .pin-modal-content { position:relative; background:#fff; padding:20px; border-radius:8px; width:320px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; }
-      .pin-modal-content .pin-input { width:100%; padding:10px; margin:12px 0; font-size:18px; text-align:center; }
-      .pin-modal-content .pin-error { color:#c0392b; min-height:1.2em; margin-bottom:8px; }
-      .pin-actions { display:flex; gap:8px; justify-content:flex-end; }
-      .pin-modal-content .muted { color:#666; margin:0 0 8px 0; }
-      .locked { opacity:0.6; }
+      .pin-modal-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
+      .pin-modal-content { position:relative; background:#fff; padding:24px; border-radius:8px; width:320px; box-shadow:0 12px 36px rgba(0,0,0,0.25); text-align:center; z-index: 10; }
+      .pin-modal-content h3 { margin: 0 0 6px; font-size: 18px; }
+      .pin-modal-content .pin-input { width:100%; box-sizing: border-box; padding:12px; margin:14px 0; font-size:22px; text-align:center; letter-spacing: 4px; border: 1px solid #ccc; border-radius: 4px; }
+      .pin-modal-content .pin-error { color:#c0392b; font-size: 12px; min-height:1.2em; margin-bottom:10px; }
+      .pin-actions { display:flex; gap:10px; justify-content:center; }
+      .pin-modal-content .muted { color:#666; font-size: 12px; margin:0; }
+      .locked { opacity:0.4; cursor: not-allowed !important; }
     </style>
   </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <footer class="app-footer">
+    <div class="footer-content">
+      <p><strong>Made by SSG Loya</strong></p>
+      <p>Native Live Alert Network</p>
+    </div>
+  </footer>
 
   <script src="app.js"></script>
 </body>
