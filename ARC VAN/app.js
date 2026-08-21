@@ -17,6 +17,17 @@ const driverRequestList = document.querySelector('#driver-request-list');
 const driverWalkerList = document.querySelector('#driver-walker-list');
 const clearAllWalkersBtn = document.querySelector('#clear-all-walkers-btn');
 
+const driverPocForm = document.querySelector('#driver-poc-form');
+const driverPocNameInput = document.querySelector('#driver-poc-name');
+const driverPocContactInput = document.querySelector('#driver-poc-contact');
+const driverPocClearBtn = document.querySelector('#driver-poc-clear');
+
+const studentDisplayDriverName = document.querySelector('#student-display-driver-name');
+const studentDisplayDriverContact = document.querySelector('#student-display-driver-contact');
+const studentPocActionContainer = document.querySelector('#student-poc-action-container');
+const sidebarDriverName = document.querySelector('#sidebar-driver-name');
+const sidebarDriverAvatar = document.querySelector('#sidebar-driver-avatar');
+
 const driverAppQr = document.querySelector('#driver-app-qr');
 const studentAppQr = document.querySelector('#student-app-qr');
 const driverQrUrl = document.querySelector('.driver-qr-url');
@@ -61,7 +72,7 @@ function setDriverAuthenticated(token, pin) {
 function updateDriverControls() {
   const driverView = document.querySelector('#driver-view');
   if (!driverView) return;
-  const controls = driverView.querySelectorAll('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, .request-alert-btn, #clear-all-walkers-btn');
+  const controls = driverView.querySelectorAll('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, .request-alert-btn, #clear-all-walkers-btn, #driver-poc-form input, #driver-poc-form button');
   const authed = isDriverAuthenticated();
   controls.forEach((el) => {
     try { el.disabled = !authed; } catch (e) {}
@@ -104,7 +115,6 @@ function playAlertTone() {
   } catch (e) {}
 }
 
-// Resilient Native WebSocket with Active 15-second Heartbeat Keep-Alive
 function initWebSocket() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     return;
@@ -141,6 +151,9 @@ function initWebSocket() {
           playAlertTone();
           showToast(`🚶 Incoming: ${data.new_name} is walking to the van!`);
         }
+      } else if (data.type === 'POC_UPDATED') {
+        renderDriverPOC(data.poc);
+        showToast('Driver POC updated');
       } else if (data.type === 'NEW_RIDE_REQUEST') {
         playAlertTone();
         showToast(`🚖 New Ride: ${data.name} (${data.pickup} → ${data.dropoff})`);
@@ -177,6 +190,60 @@ function renderReceivedAlert(alert) {
   }
 
   showToast(`🚐 ${alert.title}`);
+}
+
+function renderDriverPOC(poc) {
+  const name = poc && poc.driver_name ? poc.driver_name.trim() : '';
+  const contact = poc && poc.contact_info ? poc.contact_info.trim() : '';
+
+  if (driverPocNameInput && document.activeElement !== driverPocNameInput) {
+    driverPocNameInput.value = name;
+  }
+  if (driverPocContactInput && document.activeElement !== driverPocContactInput) {
+    driverPocContactInput.value = contact;
+  }
+
+  if (sidebarDriverName) {
+    sidebarDriverName.textContent = name || 'On-Duty Driver';
+  }
+  if (sidebarDriverAvatar) {
+    sidebarDriverAvatar.textContent = name ? name.slice(0, 2).toUpperCase() : 'DV';
+  }
+
+  if (studentDisplayDriverName) {
+    studentDisplayDriverName.textContent = name ? `Duty Driver: ${name}` : '045/048 Duty Driver';
+  }
+
+  if (studentDisplayDriverContact) {
+    if (contact) {
+      studentDisplayDriverContact.innerHTML = `Direct Contact: <strong style="color:var(--coral);">${contact}</strong>`;
+    } else {
+      studentDisplayDriverContact.textContent = 'No direct phone/signal listed. Use the alert and request buttons below.';
+    }
+  }
+
+  if (studentPocActionContainer) {
+    if (contact) {
+      const isPhone = contact.replace(/[^0-9]/g, '').length >= 7;
+      if (isPhone) {
+        studentPocActionContainer.innerHTML = `
+          <a href="tel:${contact}" class="primary-btn" style="text-decoration:none; display:inline-block; padding:8px 14px; font-size:12px;">📞 Call Driver</a>
+        `;
+      } else {
+        studentPocActionContainer.innerHTML = `
+          <button class="secondary-btn" id="copy-poc-btn" style="padding:8px 12px; font-size:11px;">📋 Copy Contact</button>
+        `;
+        const copyBtn = document.querySelector('#copy-poc-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(contact).then(() => showToast('Driver contact copied to clipboard!'));
+          });
+        }
+      }
+    } else {
+      studentPocActionContainer.innerHTML = '';
+    }
+  }
 }
 
 function displayVanName(text) {
@@ -245,7 +312,7 @@ window.addEventListener('load', () => {
   if (driverView) {
     driverView.addEventListener('click', (e) => {
       if (isDriverAuthenticated()) return;
-      const target = e.target.closest('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, #clear-all-walkers-btn');
+      const target = e.target.closest('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, #clear-all-walkers-btn, #driver-poc-form button');
       if (target) {
         e.preventDefault();
         e.stopPropagation();
@@ -254,6 +321,53 @@ window.addEventListener('load', () => {
     }, true);
   }
 });
+
+// Driver POC Form submit
+if (driverPocForm) {
+  driverPocForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!isDriverAuthenticated()) return;
+    const name = driverPocNameInput ? driverPocNameInput.value.trim() : '';
+    const contact = driverPocContactInput ? driverPocContactInput.value.trim() : '';
+
+    fetch('/api/driver/poc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pin: getStoredDriverPin(),
+        driver_name: name,
+        contact_info: contact
+      })
+    })
+    .then((res) => res.json())
+    .then((data) => {
+      renderDriverPOC(data.poc);
+      showToast('Driver POC updated for students!');
+    })
+    .catch(() => showToast('Failed to save POC.'));
+  });
+}
+
+if (driverPocClearBtn) {
+  driverPocClearBtn.addEventListener('click', () => {
+    if (!isDriverAuthenticated()) return;
+    fetch('/api/driver/poc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pin: getStoredDriverPin(),
+        driver_name: '',
+        contact_info: ''
+      })
+    })
+    .then((res) => res.json())
+    .then((data) => {
+      renderDriverPOC(data.poc);
+      showToast('Driver POC cleared');
+    })
+    .catch(() => showToast('Failed to clear POC.'));
+  });
+}
 
 async function sendDriverAlert(title, detail, toastMessage, location = null) {
   try {
@@ -641,6 +755,7 @@ function syncInitialData() {
     .then((data) => {
       if (data.manifest) renderDriverRequests(data.manifest);
       if (data.walkers) renderDriverWalkers(data.walkers);
+      if (data.poc) renderDriverPOC(data.poc);
       if (data.walking_count !== undefined && walkingCount) {
         walkingCount.innerHTML = `${data.walking_count} <small>students</small>`;
       }
@@ -659,5 +774,4 @@ function syncInitialData() {
     .catch(() => {});
 }
 
-// Background poll fallback every 4 seconds to guarantee sync even across proxy resets
 setInterval(syncInitialData, 4000);
