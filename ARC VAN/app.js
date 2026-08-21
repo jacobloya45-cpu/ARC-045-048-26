@@ -197,7 +197,7 @@ function renderDriverPOC(poc) {
   const name = (poc.driver_name || '').trim();
   const contact = (poc.contact_info || '').trim();
 
-  // Populate driver inputs if not actively being typed in
+  // Populate driver inputs if not focused
   if (driverPocNameInput && document.activeElement !== driverPocNameInput) {
     driverPocNameInput.value = name;
   }
@@ -213,7 +213,7 @@ function renderDriverPOC(poc) {
     sidebarDriverAvatar.textContent = name ? name.slice(0, 2).toUpperCase() : 'DV';
   }
 
-  // Update student display
+  // Update student view POC display
   if (studentDisplayDriverName) {
     studentDisplayDriverName.textContent = name ? `Duty Driver: ${name}` : '045/048 Duty Driver';
   }
