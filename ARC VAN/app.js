@@ -153,7 +153,7 @@ function initWebSocket() {
         }
       } else if (data.type === 'POC_UPDATED') {
         renderDriverPOC(data.poc);
-        showToast('Driver POC updated');
+        showToast('Driver POC updated live');
       } else if (data.type === 'NEW_RIDE_REQUEST') {
         playAlertTone();
         showToast(`🚖 New Ride: ${data.name} (${data.pickup} → ${data.dropoff})`);
@@ -193,9 +193,11 @@ function renderReceivedAlert(alert) {
 }
 
 function renderDriverPOC(poc) {
-  const name = poc && poc.driver_name ? poc.driver_name.trim() : '';
-  const contact = poc && poc.contact_info ? poc.contact_info.trim() : '';
+  if (!poc) return;
+  const name = (poc.driver_name || '').trim();
+  const contact = (poc.contact_info || '').trim();
 
+  // Populate driver inputs if not actively being typed in
   if (driverPocNameInput && document.activeElement !== driverPocNameInput) {
     driverPocNameInput.value = name;
   }
@@ -203,6 +205,7 @@ function renderDriverPOC(poc) {
     driverPocContactInput.value = contact;
   }
 
+  // Update sidebar branding
   if (sidebarDriverName) {
     sidebarDriverName.textContent = name || 'On-Duty Driver';
   }
@@ -210,13 +213,14 @@ function renderDriverPOC(poc) {
     sidebarDriverAvatar.textContent = name ? name.slice(0, 2).toUpperCase() : 'DV';
   }
 
+  // Update student display
   if (studentDisplayDriverName) {
     studentDisplayDriverName.textContent = name ? `Duty Driver: ${name}` : '045/048 Duty Driver';
   }
 
   if (studentDisplayDriverContact) {
     if (contact) {
-      studentDisplayDriverContact.innerHTML = `Direct Contact: <strong style="color:var(--coral);">${contact}</strong>`;
+      studentDisplayDriverContact.innerHTML = `Direct Contact: <strong style="color:var(--coral); font-size: 14px;">${contact}</strong>`;
     } else {
       studentDisplayDriverContact.textContent = 'No direct phone/signal listed. Use the alert and request buttons below.';
     }
@@ -231,12 +235,22 @@ function renderDriverPOC(poc) {
         `;
       } else {
         studentPocActionContainer.innerHTML = `
-          <button class="secondary-btn" id="copy-poc-btn" style="padding:8px 12px; font-size:11px;">📋 Copy Contact</button>
+          <button class="secondary-btn" id="copy-poc-btn" type="button" style="padding:8px 12px; font-size:11px;">📋 Copy Contact</button>
         `;
         const copyBtn = document.querySelector('#copy-poc-btn');
         if (copyBtn) {
           copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(contact).then(() => showToast('Driver contact copied to clipboard!'));
+            try {
+              navigator.clipboard.writeText(contact);
+            } catch (e) {
+              const temp = document.createElement('input');
+              temp.value = contact;
+              document.body.appendChild(temp);
+              temp.select();
+              document.execCommand('copy');
+              document.body.removeChild(temp);
+            }
+            showToast('Driver contact copied!');
           });
         }
       }
@@ -322,7 +336,7 @@ window.addEventListener('load', () => {
   }
 });
 
-// Driver POC Form submit
+// Driver POC Form submit handler
 if (driverPocForm) {
   driverPocForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -342,7 +356,7 @@ if (driverPocForm) {
     .then((res) => res.json())
     .then((data) => {
       renderDriverPOC(data.poc);
-      showToast('Driver POC updated for students!');
+      showToast('Driver POC published for students!');
     })
     .catch(() => showToast('Failed to save POC.'));
   });
