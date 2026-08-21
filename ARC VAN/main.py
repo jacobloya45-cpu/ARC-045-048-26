@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import json
+import asyncio
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -15,6 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
+# --- Native WebSocket Manager with Safe Broadcast ---
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -29,17 +31,18 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict):
         payload = json.dumps(message)
-        dead_connections = []
-        for connection in self.active_connections:
+        dead = []
+        for connection in list(self.active_connections):
             try:
                 await connection.send_text(payload)
             except Exception:
-                dead_connections.append(connection)
-        for dead in dead_connections:
-            self.disconnect(dead)
+                dead.append(connection)
+        for d in dead:
+            self.disconnect(d)
 
 manager = ConnectionManager()
 
+# --- Pydantic Data Models ---
 class PinVerifyPayload(BaseModel):
     pin: str
 
@@ -78,6 +81,7 @@ class UpdateStatus(BaseModel):
 class DriverRequestQuery(BaseModel):
     pin: str
 
+# --- WebSocket Endpoint with Heartbeat Listener ---
 @app.websocket("/ws/alerts")
 async def websocket_alerts_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
@@ -85,14 +89,12 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             try:
-                parsed = json.loads(data)
-                if parsed.get("type") == "PING":
+                msg = json.loads(data)
+                if msg.get("type") == "PING":
                     await websocket.send_text(json.dumps({"type": "PONG"}))
             except Exception:
                 pass
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-    except Exception:
+    except (WebSocketDisconnect, Exception):
         manager.disconnect(websocket)
 
 @app.get("/healthz")
