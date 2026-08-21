@@ -23,7 +23,7 @@
       </nav>
       <div class="sidebar-footer">
         <div class="status-dot"><span></span> Native Live Feed Active</div>
-        <div class="profile"><div class="avatar">JM</div><div><strong>Jordan Miles</strong><small>Driver · 045/048 Van</small></div></div>
+        <div class="profile"><div class="avatar" id="sidebar-driver-avatar">DV</div><div><strong id="sidebar-driver-name">On-Duty Driver</strong><small>045/048 Shuttle</small></div></div>
       </div>
     </aside>
 
@@ -72,6 +72,29 @@
           <article class="stat-card"><div class="stat-head"><span>RIDES TODAY</span><span class="stat-icon">↗</span></div><strong>Active</strong><div class="stat-foot"><span class="up">↑ Live</span><span>Direct Socket</span></div></article>
           <article class="stat-card"><div class="stat-head"><span>HEADING TO VAN</span><span class="stat-icon">→</span></div><strong id="walking-count">0 <small>students</small></strong><div class="stat-foot"><span>Incoming arrivals</span></div></article>
         </div>
+
+        <!-- DRIVER POC CONFIGURATION PANEL -->
+        <section class="panel" style="border-left: 4px solid var(--mint-deep); margin-bottom: 20px;">
+          <div class="panel-header">
+            <div>
+              <span class="section-kicker">DRIVER POC (OPTIONAL)</span>
+              <h3>On-Duty Driver Contact Information</h3>
+            </div>
+          </div>
+          <p class="muted" style="margin-bottom: 14px;">Set or update your name and phone number/Signal handle. This displays for students so they can reach the active driver directly.</p>
+          <form id="driver-poc-form" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 1; min-width: 180px;">
+              <label for="driver-poc-name" style="font-size: 11px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px;">DRIVER NAME / RANK</label>
+              <input id="driver-poc-name" type="text" placeholder="e.g. SGT Miller / Driver 1" maxlength="60" style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+            </div>
+            <div style="flex: 1; min-width: 180px;">
+              <label for="driver-poc-contact" style="font-size: 11px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px;">PHONE / SIGNAL CODE</label>
+              <input id="driver-poc-contact" type="text" placeholder="e.g. (502) 555-0199 or Signal ID" maxlength="80" style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+            </div>
+            <button class="primary-btn" type="submit" style="padding: 10px 16px;">Save POC</button>
+            <button class="secondary-btn" id="driver-poc-clear" type="button" style="padding: 10px 14px;">Clear POC</button>
+          </form>
+        </section>
 
         <!-- LIVE HEADING TO VAN MANIFEST -->
         <section class="panel driver-requests-panel" style="border-left: 4px solid var(--coral); margin-bottom: 20px;">
@@ -136,6 +159,18 @@
           <div><span class="section-kicker">STUDENT ALERTS</span><h2>Stay ready for your ride.</h2><p>Get departure and service updates directly from the driver.</p></div>
           <div class="student-orbit-wrap"><div class="student-orbit"><span>ARC<br><b>VAN</b></span></div></div>
         </div>
+
+        <!-- DRIVER POC STUDENT DISPLAY CARD -->
+        <section class="panel" style="border-left: 4px solid var(--mint-deep); margin-bottom: 20px; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <span class="section-kicker" style="color: var(--mint-deep); margin-bottom: 3px;">ON-DUTY DRIVER CONTACT</span>
+              <h3 id="student-display-driver-name" style="margin: 2px 0 4px; font-size: 17px;">Duty Driver Assigned</h3>
+              <p id="student-display-driver-contact" class="muted" style="margin: 0; font-size: 13px;">No direct phone/signal listed. Use the alerts and request buttons below.</p>
+            </div>
+            <div id="student-poc-action-container"></div>
+          </div>
+        </section>
 
         <div class="student-grid">
           <section class="panel alert-panel">
