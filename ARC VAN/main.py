@@ -15,6 +15,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
+# Global In-Memory Fallback Cache to ensure 100% instant sync across devices
+ACTIVE_POC = database.get_driver_poc()
+
 # --- Native WebSocket Connection Manager ---
 class ConnectionManager:
     def __init__(self):
@@ -112,23 +115,26 @@ def verify_driver_pin(payload: PinVerifyPayload):
 
 @app.get("/api/driver/poc")
 def get_poc():
-    return database.get_driver_poc()
+    global ACTIVE_POC
+    return ACTIVE_POC
 
 @app.post("/api/driver/poc")
 async def set_poc(payload: DriverPOCPayload):
+    global ACTIVE_POC
     if payload.pin != DRIVER_PIN:
         raise HTTPException(status_code=403, detail="Invalid Driver PIN")
     
     d_name = (payload.driver_name or "").strip()
     c_info = (payload.contact_info or "").strip()
+    
     database.save_driver_poc(d_name, c_info)
-    poc_data = database.get_driver_poc()
+    ACTIVE_POC = {"driver_name": d_name, "contact_info": c_info, "updated_at": "Just now"}
     
     await manager.broadcast({
         "type": "POC_UPDATED",
-        "poc": poc_data
+        "poc": ACTIVE_POC
     })
-    return {"success": True, "poc": poc_data}
+    return {"success": True, "poc": ACTIVE_POC}
 
 @app.get("/api/alerts/latest")
 def latest_alert():
@@ -136,10 +142,11 @@ def latest_alert():
 
 @app.get("/api/status")
 def get_status():
+    global ACTIVE_POC
     status = database.get_queue_data()
     status["walkers"] = database.get_walking_list()
     status["walking_count"] = len(status["walkers"])
-    status["poc"] = database.get_driver_poc()
+    status["poc"] = ACTIVE_POC
     return status
 
 @app.post("/api/driver/broadcast")
@@ -169,12 +176,13 @@ async def broadcast_alert(alert: AlertPayload):
 
 @app.post("/api/driver/requests")
 def driver_requests(payload: DriverRequestQuery):
+    global ACTIVE_POC
     if payload.pin != DRIVER_PIN:
         raise HTTPException(status_code=403, detail="Invalid Driver PIN")
     return {
         "requests": database.get_queue_data()["manifest"],
         "walkers": database.get_walking_list(),
-        "poc": database.get_driver_poc()
+        "poc": ACTIVE_POC
     }
 
 @app.post("/api/driver/complete-request")
