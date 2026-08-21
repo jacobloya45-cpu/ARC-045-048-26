@@ -49,8 +49,43 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS driver_poc (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            driver_name TEXT,
+            contact_info TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("INSERT OR IGNORE INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
+
     conn.commit()
     conn.close()
+
+def save_driver_poc(driver_name: str, contact_info: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO driver_poc (id, driver_name, contact_info, updated_at) 
+        VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET 
+            driver_name = excluded.driver_name,
+            contact_info = excluded.contact_info,
+            updated_at = CURRENT_TIMESTAMP
+    """, (driver_name, contact_info))
+    conn.commit()
+    conn.close()
+
+def get_driver_poc():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT driver_name, contact_info, updated_at FROM driver_poc WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return {"driver_name": "", "contact_info": "", "updated_at": ""}
+    return {"driver_name": row[0] or "", "contact_info": row[1] or "", "updated_at": row[2] or ""}
 
 def save_alert(title, detail, location=None):
     conn = sqlite3.connect(DB_NAME)
