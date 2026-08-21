@@ -449,3 +449,33 @@ if (window.location.hash === '#student-signup') {
   switchView('student');
   document.querySelector('#student-signup').scrollIntoView({ behavior: 'smooth' });
 }
+// ----- ntfy push-alert integration -----
+// Fetch the server's ntfy topic config and populate the driver + student
+// info panels (topic names, subscribe URLs, and QR codes).
+(function initNtfyPanels() {
+  const qrApi = 'https://api.qrserver.com/v1/create-qr-code/?size=312x312&margin=8&data=';
+  const driverTopic = document.querySelector('#ntfy-students-topic');
+  const driverUrl = document.querySelector('#ntfy-students-url');
+  const driverQr = document.querySelector('#ntfy-students-qr');
+  const studentTopic = document.querySelector('#ntfy-student-topic');
+  const studentUrl = document.querySelector('#ntfy-student-url');
+  const studentQr = document.querySelector('#ntfy-student-qr');
+
+  function paint(cfg) {
+    const s = cfg && cfg.students;
+    const d = cfg && cfg.driver;
+    if (s && s.topic) {
+      if (driverTopic) driverTopic.textContent = s.topic;
+      if (studentTopic) studentTopic.textContent = s.topic;
+      if (driverUrl) { driverUrl.textContent = s.url; driverUrl.href = s.url; }
+      if (studentUrl) { studentUrl.textContent = s.url; studentUrl.href = s.url; }
+      if (driverQr) driverQr.src = qrApi + encodeURIComponent(s.url);
+      if (studentQr) studentQr.src = qrApi + encodeURIComponent(s.url);
+    }
+  }
+
+  fetch('/api/ntfy/config', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((cfg) => { if (cfg) paint(cfg); })
+    .catch(() => { /* keep the hardcoded defaults already in the HTML */ });
+})();
