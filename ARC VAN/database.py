@@ -52,13 +52,15 @@ def init_db():
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS driver_poc (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
+            id INTEGER PRIMARY KEY,
             driver_name TEXT,
             contact_info TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    cursor.execute("INSERT OR IGNORE INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
+    cursor.execute("SELECT COUNT(*) FROM driver_poc WHERE id = 1")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
 
     conn.commit()
     conn.close()
@@ -66,14 +68,9 @@ def init_db():
 def save_driver_poc(driver_name: str, contact_info: str):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO driver_poc (id, driver_name, contact_info, updated_at) 
-        VALUES (1, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(id) DO UPDATE SET 
-            driver_name = excluded.driver_name,
-            contact_info = excluded.contact_info,
-            updated_at = CURRENT_TIMESTAMP
-    """, (driver_name, contact_info))
+    cursor.execute("UPDATE driver_poc SET driver_name = ?, contact_info = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (driver_name, contact_info))
+    if cursor.rowcount == 0:
+        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info) VALUES (1, ?, ?)", (driver_name, contact_info))
     conn.commit()
     conn.close()
 
