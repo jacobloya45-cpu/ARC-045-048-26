@@ -5,6 +5,8 @@ DB_NAME = "shuttle.db"
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    
+    # Ensure users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,6 +19,7 @@ def init_db():
     if "name" not in user_cols:
         cursor.execute("ALTER TABLE users ADD COLUMN name TEXT")
 
+    # Ensure requests table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,6 +31,8 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
+
+    # Ensure alerts table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +46,7 @@ def init_db():
     if "location" not in alert_columns:
         cursor.execute("ALTER TABLE alerts ADD COLUMN location TEXT")
 
+    # Ensure walking_to_van table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS walking_to_van (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,6 +56,7 @@ def init_db():
         )
     """)
 
+    # Ensure driver_poc table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS driver_poc (
             id INTEGER PRIMARY KEY,
@@ -58,14 +65,13 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    cursor.execute("SELECT COUNT(*) FROM driver_poc WHERE id = 1")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
+    cursor.execute("INSERT OR IGNORE INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
 
     conn.commit()
     conn.close()
 
 def save_driver_poc(driver_name: str, contact_info: str):
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("UPDATE driver_poc SET driver_name = ?, contact_info = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (driver_name, contact_info))
@@ -75,14 +81,19 @@ def save_driver_poc(driver_name: str, contact_info: str):
     conn.close()
 
 def get_driver_poc():
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT driver_name, contact_info, updated_at FROM driver_poc WHERE id = 1")
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
+    try:
+        cursor.execute("SELECT driver_name, contact_info, updated_at FROM driver_poc WHERE id = 1")
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return {"driver_name": "", "contact_info": "", "updated_at": ""}
+        return {"driver_name": row[0] or "", "contact_info": row[1] or "", "updated_at": row[2] or ""}
+    except Exception:
+        conn.close()
         return {"driver_name": "", "contact_info": "", "updated_at": ""}
-    return {"driver_name": row[0] or "", "contact_info": row[1] or "", "updated_at": row[2] or ""}
 
 def save_alert(title, detail, location=None):
     conn = sqlite3.connect(DB_NAME)
