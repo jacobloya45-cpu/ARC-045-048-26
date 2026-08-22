@@ -551,7 +551,6 @@ document.querySelectorAll('.departure-option').forEach((button) => button.addEve
   if (departureTime) departureTime.textContent = `${button.dataset.wait} min`;
 }));
 
-// Submit Ride Request (No Email required, optional phone/signal contact)
 function submitStudentRideRequest(pickup, dropoff) {
   const nameInput = document.querySelector('#student-rider-name');
   const contactInput = document.querySelector('#student-rider-contact');
@@ -657,22 +656,27 @@ if (sendCustomRideBtn) {
   });
 }
 
-// Heading to Van Notification (No Email required, optional phone/signal contact)
 if (headingToVanForm) {
   headingToVanForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    const name = headingToVanForm.elements.name.value.trim();
-    const contact = headingToVanForm.elements.contact ? headingToVanForm.elements.contact.value.trim() : '';
+    const nameInput = headingToVanForm.querySelector('input[name="name"]');
+    const contactInput = headingToVanForm.querySelector('input[name="contact"]');
+    
+    const name = nameInput ? nameInput.value.trim() : '';
+    const contact = contactInput ? contactInput.value.trim() : '';
     if (!name) return;
     
     fetch('/api/student/heading-to-van', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: name, contact: contact })
-    }).then(() => {
+    })
+    .then((res) => res.json())
+    .then(() => {
       headingToVanForm.reset();
       showToast("Driver notified you're heading to the van!");
-    });
+    })
+    .catch(() => showToast('Failed to notify driver'));
   });
 }
 
@@ -705,7 +709,6 @@ function switchView(view) {
   }
 }
 
-// Render Incoming Walkers Manifest on Driver Console
 function renderDriverWalkers(walkers) {
   if (!driverWalkerList) return;
   if (!walkers || !walkers.length) {
@@ -736,7 +739,6 @@ function renderDriverWalkers(walkers) {
   });
 }
 
-// Render Student Pickup Requests on Driver Console
 function renderDriverRequests(requests) {
   if (!driverRequestList) return;
   if (waitingCount) waitingCount.innerHTML = `${requests.length} <small>students</small>`;
