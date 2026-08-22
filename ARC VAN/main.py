@@ -1,5 +1,7 @@
 import os
 import json
+import urllib.request
+import urllib.error
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -13,8 +15,28 @@ database.init_db()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
+NTFY_TOPIC = "arc-van-fort-knox-045048"
 
 ACTIVE_POC = database.get_driver_poc()
+
+def publish_ntfy(title: str, message: str, tags: str = "minibus"):
+    """Non-blocking background push to ntfy.sh"""
+    try:
+        req = urllib.request.Request(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            data=message.encode("utf-8"),
+            headers={
+                "Title": title.encode("ascii", "ignore").decode("ascii"),
+                "Priority": "high",
+                "Tags": tags,
+                "User-Agent": "ARC-Van-Tracker/1.0"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            pass
+    except Exception as e:
+        print(f"Ntfy push error: {e}")
 
 class ConnectionManager:
     def __init__(self):
@@ -41,7 +63,6 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- Data Models ---
 class PinVerifyPayload(BaseModel):
     pin: str
 
@@ -152,13 +173,15 @@ async def broadcast_alert(alert: AlertPayload):
         raise HTTPException(status_code=403, detail="Invalid Driver PIN")
 
     loc = alert.location or alert.current_stop
-    subject = alert.title or f"🚐 Van Location: {loc}"
+    subject = alert.title or f"Van Location: {loc}"
     body = alert.detail or f"045/048 Van is currently at {loc}."
 
     database.clear_requests_at_location(loc)
     alert_id = database.save_alert(subject, body, loc)
     latest = database.get_latest_alert()
     queue_data = database.get_queue_data()
+
+    publish_ntfy(subject, body, "round_pushpin,bus")
 
     await manager.broadcast({
         "type": "NEW_ALERT",
@@ -220,6 +243,13 @@ async def request_ride(req: RideRequest):
         status=assigned_status
     )
 
+    contact_text = f" ({req.contact.strip()})" if req.contact else ""
+    publish_ntfy(
+        f"Ride Request: {req.name.strip()}",
+        f"{req.pickup.strip()} -> {req.dropoff.strip()}{contact_text}",
+        "taxi"
+    )
+
     queue_data = database.get_queue_data()
     await manager.broadcast({
         "type": "NEW_RIDE_REQUEST",
@@ -241,6 +271,13 @@ async def heading_to_van(payload: WalkerPayload):
     database.add_active_walker(
         name=payload.name.strip(),
         contact=(payload.contact or '').strip()
+    )
+
+    contact_text = f" ({payload.contact.strip()})" if payload.contact else ""
+    publish_ntfy(
+        "Student Heading to Van",
+        f"{payload.name.strip()} is on the way to the pickup spot{contact_text}.",
+        "walking"
     )
 
     walkers = database.get_walking_list()
