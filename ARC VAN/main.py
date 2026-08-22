@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import json
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -42,7 +41,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- Pydantic Data Models (No Email Required) ---
+# --- Data Models ---
 class PinVerifyPayload(BaseModel):
     pin: str
 
@@ -210,23 +209,16 @@ async def remove_walker(payload: RemoveWalkerPayload):
 
 @app.post("/api/request-ride")
 async def request_ride(req: RideRequest):
-    conn = sqlite3.connect(database.DB_NAME)
-    cursor = conn.cursor()
-    
-    # Store user with name and optional contact
-    cursor.execute("INSERT INTO users (name, contact) VALUES (?, ?)", (req.name, req.contact or ""))
-    user_id = cursor.lastrowid
+    queue_info = database.get_queue_data()
+    assigned_status = "CONFIRMED" if queue_info["active_count"] < MAX_CAPACITY else "WAITLIST"
 
-    cursor.execute("SELECT COUNT(*) FROM requests WHERE status IN ('CONFIRMED', 'BOARDED')")
-    active_count = cursor.fetchone()[0]
-    assigned_status = "CONFIRMED" if active_count < MAX_CAPACITY else "WAITLIST"
-
-    cursor.execute(
-        "INSERT INTO requests (user_id, pickup, dropoff, status) VALUES (?, ?, ?, ?)",
-        (user_id, req.pickup, req.dropoff, assigned_status)
+    database.add_ride_request(
+        name=req.name.strip(),
+        contact=(req.contact or '').strip(),
+        pickup=req.pickup.strip(),
+        dropoff=req.dropoff.strip(),
+        status=assigned_status
     )
-    conn.commit()
-    conn.close()
 
     queue_data = database.get_queue_data()
     await manager.broadcast({
@@ -246,13 +238,10 @@ async def request_ride(req: RideRequest):
 
 @app.post("/api/student/heading-to-van")
 async def heading_to_van(payload: WalkerPayload):
-    conn = sqlite3.connect(database.DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO users (name, contact) VALUES (?, ?)", (payload.name, payload.contact or ""))
-    user_id = cursor.lastrowid
-    cursor.execute("INSERT INTO walking_to_van (user_id) VALUES (?)", (user_id,))
-    conn.commit()
-    conn.close()
+    database.add_active_walker(
+        name=payload.name.strip(),
+        contact=(payload.contact or '').strip()
+    )
 
     walkers = database.get_walking_list()
     await manager.broadcast({
@@ -262,7 +251,7 @@ async def heading_to_van(payload: WalkerPayload):
         "new_name": payload.name,
         "new_contact": payload.contact or ""
     })
-    return {"success": True}
+    return {"success": True, "count": len(walkers)}
 
 @app.post("/api/driver/clear-walking")
 async def clear_walking(payload: UpdateStatus):
