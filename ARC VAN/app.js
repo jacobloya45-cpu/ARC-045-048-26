@@ -44,19 +44,21 @@ let socket = null;
 let heartbeatTimer = null;
 let currentAlertRawTime = null;
 
-// Direct client-side push to Ntfy (Bypasses backend proxies entirely)
-function sendNtfyClient(title, message, tags = ['minibus']) {
-  fetch('https://ntfy.sh', {
+// Direct client POST to ntfy.sh/<topic>
+function sendNtfyClient(title, message, tags = 'minibus') {
+  // Strip emojis from header title
+  const cleanTitle = (title || 'ARC Van Alert').replace(/[^\x00-\x7F]/g, '').trim() || 'ARC Van Alert';
+  const tagString = Array.isArray(tags) ? tags.join(',') : tags;
+
+  fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      topic: NTFY_TOPIC,
-      title: title,
-      message: message,
-      priority: 4,
-      tags: tags
-    })
-  }).catch((e) => console.log('Client Ntfy notice', e));
+    headers: {
+      'Title': cleanTitle,
+      'Priority': 'urgent',
+      'Tags': tagString
+    },
+    body: message
+  }).catch((e) => console.log('Direct Ntfy Notice:', e));
 }
 
 function loadSavedStudentProfile() {
@@ -430,7 +432,7 @@ if (driverPocForm) {
     const contact = driverPocContactInput ? driverPocContactInput.value.trim() : '';
 
     if (name) {
-      sendNtfyClient(`Duty Driver: ${name}`, `Active on-duty driver is ${name}. Direct contact: ${contact || 'N/A'}`, ['identification_card', 'phone']);
+      sendNtfyClient(`Duty Driver: ${name}`, `Active on-duty driver is ${name}. Direct contact: ${contact || 'N/A'}`, 'identification_card,phone');
     }
 
     fetch('/api/driver/poc', {
@@ -473,8 +475,7 @@ if (driverPocClearBtn) {
 }
 
 async function sendDriverAlert(title, detail, toastMessage, location = null) {
-  // Push directly to Ntfy from client
-  sendNtfyClient(title, detail, ['round_pushpin', 'bus']);
+  sendNtfyClient(title, detail, 'round_pushpin,bus');
 
   try {
     const response = await fetch('/api/driver/broadcast', {
@@ -660,9 +661,8 @@ function submitStudentRideRequest(pickup, dropoff) {
 
   saveStudentProfile(name, contact);
 
-  // Push directly to Ntfy from browser
   const contactText = contact ? ` (${contact})` : '';
-  sendNtfyClient(`Ride Request: ${name}`, `Pickup: ${pickup} -> Dropoff: ${dropoff}${contactText}`, ['taxi', 'bell']);
+  sendNtfyClient(`Ride Request: ${name}`, `Pickup: ${pickup} -> Dropoff: ${dropoff}${contactText}`, 'taxi,bell');
 
   fetch('/api/request-ride', {
     method: 'POST',
@@ -769,7 +769,7 @@ if (headingToVanForm) {
     saveStudentProfile(name, contact);
     
     const contactText = contact ? ` (${contact})` : '';
-    sendNtfyClient(`Incoming Walker: ${name}`, `${name} is heading to the pickup spot now${contactText}.`, ['walking', 'information_source']);
+    sendNtfyClient(`Incoming Walker: ${name}`, `${name} is heading to the pickup spot now${contactText}.`, 'walking,information_source');
 
     fetch('/api/student/heading-to-van', {
       method: 'POST',
