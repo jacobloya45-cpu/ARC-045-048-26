@@ -37,12 +37,24 @@ const studentQrUrl = document.querySelector('.student-qr-url');
 const driverAuthKey = 'arc-van-driver-auth';
 const driverPinKey = 'arc-van-driver-token';
 const studentProfileKey = 'arc-van-student-profile';
+const NTFY_TOPIC = 'arc-van-knox-045048';
 
 let currentVanLocation = '';
 let studentSelectedPickup = '';
 let socket = null;
 let heartbeatTimer = null;
 let currentAlertRawTime = null;
+
+// Direct browser push using query parameters (100% CORS-safe)
+function sendNtfyClient(title, message, tags = 'minibus') {
+  const cleanTitle = (title || 'ARC Van Alert').replace(/[^\x00-\x7F]/g, '').trim() || 'ARC Van Alert';
+  const url = `https://ntfy.sh/${NTFY_TOPIC}?title=${encodeURIComponent(cleanTitle)}&tags=${encodeURIComponent(tags)}&priority=urgent`;
+  
+  fetch(url, {
+    method: 'POST',
+    body: message || 'Update'
+  }).catch((e) => console.log('Client Ntfy notice:', e));
+}
 
 function loadSavedStudentProfile() {
   try {
@@ -411,13 +423,15 @@ window.addEventListener('load', () => {
 if (testNtfyBtn) {
   testNtfyBtn.addEventListener('click', () => {
     if (!isDriverAuthenticated()) return;
+    sendNtfyClient('Manual Test Alert', 'This is a test notification triggered from the button.', 'bell,white_check_mark');
+    
     fetch('/api/test-ntfy')
       .then((res) => res.json())
       .then((data) => {
-        if (data.rider.success && data.driver.success) {
-          showToast('✅ Ntfy push channels verified! (200 OK)');
+        if (data.success) {
+          showToast('✅ Ntfy push delivered! (200 OK)');
         } else {
-          showToast(`⚠️ Ntfy status: Rider: ${data.rider.status || data.rider.error}`);
+          showToast(`⚠️ Server response: ${data.status || data.error}`);
         }
       })
       .catch((err) => showToast(`❌ Connection error: ${err.message}`));
@@ -431,6 +445,8 @@ if (driverPocForm) {
     const name = driverPocNameInput ? driverPocNameInput.value.trim() : '';
     const contact = driverPocContactInput ? driverPocContactInput.value.trim() : '';
 
+    sendNtfyClient(`Duty Driver: ${name}`, `On-duty driver is ${name}. Direct contact: ${contact || 'N/A'}`, 'identification_card,phone');
+
     fetch('/api/driver/poc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -443,7 +459,7 @@ if (driverPocForm) {
     .then((res) => res.json())
     .then((data) => {
       renderDriverPOC(data.poc);
-      showToast('Driver POC published for students & Rider feed!');
+      showToast('Driver POC published & sent to Ntfy!');
     })
     .catch(() => showToast('Failed to save POC.'));
   });
@@ -452,6 +468,8 @@ if (driverPocForm) {
 if (driverPocClearBtn) {
   driverPocClearBtn.addEventListener('click', () => {
     if (!isDriverAuthenticated()) return;
+    sendNtfyClient('Duty Driver Cleared', 'Duty driver contact has been reset.', 'heavy_minus_sign');
+
     fetch('/api/driver/poc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -471,6 +489,9 @@ if (driverPocClearBtn) {
 }
 
 async function sendDriverAlert(title, detail, toastMessage, location = null) {
+  // Direct client push
+  sendNtfyClient(title, detail, 'round_pushpin,bus');
+
   try {
     const response = await fetch('/api/driver/broadcast', {
       method: 'POST',
@@ -655,6 +676,10 @@ function submitStudentRideRequest(pickup, dropoff) {
 
   saveStudentProfile(name, contact);
 
+  // Client push to Ntfy
+  const contactText = contact ? ` (${contact})` : '';
+  sendNtfyClient(`Ride Request: ${name}`, `Pickup: ${pickup} -> Dropoff: ${dropoff}${contactText}`, 'taxi,bell');
+
   fetch('/api/request-ride', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -759,6 +784,9 @@ if (headingToVanForm) {
 
     saveStudentProfile(name, contact);
 
+    const contactText = contact ? ` (${contact})` : '';
+    sendNtfyClient(`Incoming Walker: ${name}`, `${name} is walking to the van now${contactText}.`, 'walking,information_source');
+
     fetch('/api/student/heading-to-van', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -776,6 +804,8 @@ if (headingToVanForm) {
 if (clearAllWalkersBtn) {
   clearAllWalkersBtn.addEventListener('click', () => {
     if (!isDriverAuthenticated()) return;
+    sendNtfyClient('Walkers Cleared', 'Driver cleared incoming walkers.', 'broom');
+    
     fetch('/api/driver/clear-walking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -823,6 +853,8 @@ function renderDriverWalkers(walkers) {
   driverWalkerList.querySelectorAll('.arrive-walker-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const walkerId = btn.dataset.walkerid;
+      sendNtfyClient('Walker Boarded', `Student on walker list boarded the van.`, 'white_check_mark');
+      
       fetch('/api/driver/remove-walker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -855,6 +887,8 @@ function renderDriverRequests(requests) {
   driverRequestList.querySelectorAll('.complete-request-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const reqId = btn.dataset.reqid;
+      sendNtfyClient('Passenger Picked Up', `Passenger request #${reqId} marked picked up.`, 'white_check_mark');
+      
       fetch('/api/driver/complete-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
