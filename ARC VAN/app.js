@@ -16,6 +16,7 @@ const headingToVanForm = document.querySelector('#heading-to-van-form');
 const driverRequestList = document.querySelector('#driver-request-list');
 const driverWalkerList = document.querySelector('#driver-walker-list');
 const clearAllWalkersBtn = document.querySelector('#clear-all-walkers-btn');
+const testNtfyBtn = document.querySelector('#test-ntfy-btn');
 
 const driverPocForm = document.querySelector('#driver-poc-form');
 const driverPocNameInput = document.querySelector('#driver-poc-name');
@@ -36,30 +37,15 @@ const studentQrUrl = document.querySelector('.student-qr-url');
 const driverAuthKey = 'arc-van-driver-auth';
 const driverPinKey = 'arc-van-driver-token';
 const studentProfileKey = 'arc-van-student-profile';
-const NTFY_TOPIC = 'arc-van-fort-knox-045048';
+
+const NTFY_RIDER_TOPIC = 'arc-knox-riders-8921';
+const NTFY_DRIVER_TOPIC = 'arc-knox-drivers-8921';
 
 let currentVanLocation = '';
 let studentSelectedPickup = '';
 let socket = null;
 let heartbeatTimer = null;
 let currentAlertRawTime = null;
-
-// Direct client POST to ntfy.sh/<topic>
-function sendNtfyClient(title, message, tags = 'minibus') {
-  // Strip emojis from header title
-  const cleanTitle = (title || 'ARC Van Alert').replace(/[^\x00-\x7F]/g, '').trim() || 'ARC Van Alert';
-  const tagString = Array.isArray(tags) ? tags.join(',') : tags;
-
-  fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
-    method: 'POST',
-    headers: {
-      'Title': cleanTitle,
-      'Priority': 'urgent',
-      'Tags': tagString
-    },
-    body: message
-  }).catch((e) => console.log('Direct Ntfy Notice:', e));
-}
 
 function loadSavedStudentProfile() {
   try {
@@ -151,7 +137,7 @@ function setDriverAuthenticated(token, pin) {
 function updateDriverControls() {
   const driverView = document.querySelector('#driver-view');
   if (!driverView) return;
-  const controls = driverView.querySelectorAll('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, .request-alert-btn, #clear-all-walkers-btn, #driver-poc-form input, #driver-poc-form button');
+  const controls = driverView.querySelectorAll('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, .request-alert-btn, #clear-all-walkers-btn, #test-ntfy-btn, #driver-poc-form input, #driver-poc-form button');
   const authed = isDriverAuthenticated();
   controls.forEach((el) => {
     try { el.disabled = !authed; } catch (e) {}
@@ -414,7 +400,7 @@ window.addEventListener('load', () => {
   if (driverView) {
     driverView.addEventListener('click', (e) => {
       if (isDriverAuthenticated()) return;
-      const target = e.target.closest('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, #clear-all-walkers-btn, #driver-poc-form button');
+      const target = e.target.closest('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, #clear-all-walkers-btn, #test-ntfy-btn, #driver-poc-form button');
       if (target) {
         e.preventDefault();
         e.stopPropagation();
@@ -424,16 +410,29 @@ window.addEventListener('load', () => {
   }
 });
 
+// Diagnostic Button
+if (testNtfyBtn) {
+  testNtfyBtn.addEventListener('click', () => {
+    if (!isDriverAuthenticated()) return;
+    fetch('/api/test-ntfy')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.rider_channel.success && data.driver_channel.success) {
+          showToast('✅ Both Rider & Driver Ntfy channels verified!');
+        } else {
+          showToast(`⚠️ Ntfy response: Rider ${data.rider_channel.status}, Driver ${data.driver_channel.status}`);
+        }
+      })
+      .catch((err) => showToast(`❌ Connection error: ${err.message}`));
+  });
+}
+
 if (driverPocForm) {
   driverPocForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!isDriverAuthenticated()) return;
     const name = driverPocNameInput ? driverPocNameInput.value.trim() : '';
     const contact = driverPocContactInput ? driverPocContactInput.value.trim() : '';
-
-    if (name) {
-      sendNtfyClient(`Duty Driver: ${name}`, `Active on-duty driver is ${name}. Direct contact: ${contact || 'N/A'}`, 'identification_card,phone');
-    }
 
     fetch('/api/driver/poc', {
       method: 'POST',
@@ -447,7 +446,7 @@ if (driverPocForm) {
     .then((res) => res.json())
     .then((data) => {
       renderDriverPOC(data.poc);
-      showToast('Driver POC published for students!');
+      showToast('Driver POC published for students & Rider feed!');
     })
     .catch(() => showToast('Failed to save POC.'));
   });
@@ -475,8 +474,6 @@ if (driverPocClearBtn) {
 }
 
 async function sendDriverAlert(title, detail, toastMessage, location = null) {
-  sendNtfyClient(title, detail, 'round_pushpin,bus');
-
   try {
     const response = await fetch('/api/driver/broadcast', {
       method: 'POST',
@@ -661,9 +658,6 @@ function submitStudentRideRequest(pickup, dropoff) {
 
   saveStudentProfile(name, contact);
 
-  const contactText = contact ? ` (${contact})` : '';
-  sendNtfyClient(`Ride Request: ${name}`, `Pickup: ${pickup} -> Dropoff: ${dropoff}${contactText}`, 'taxi,bell');
-
   fetch('/api/request-ride', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -767,9 +761,6 @@ if (headingToVanForm) {
     if (!name) return;
 
     saveStudentProfile(name, contact);
-    
-    const contactText = contact ? ` (${contact})` : '';
-    sendNtfyClient(`Incoming Walker: ${name}`, `${name} is heading to the pickup spot now${contactText}.`, 'walking,information_source');
 
     fetch('/api/student/heading-to-van', {
       method: 'POST',
