@@ -6,32 +6,26 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Users table supporting optional contact
+    # Standalone requests table with embedded contact details
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS ride_requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT,
-            contact TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    user_cols = {row[1] for row in cursor.execute("PRAGMA table_info(users)").fetchall()}
-    if "name" not in user_cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN name TEXT")
-    if "contact" not in user_cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN contact TEXT")
-
-    # Requests table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
+            student_name TEXT NOT NULL,
+            contact_info TEXT DEFAULT '',
             pickup TEXT NOT NULL,
             dropoff TEXT NOT NULL,
             status TEXT DEFAULT 'CONFIRMED',
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id)
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Standalone active walkers table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS active_walkers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_name TEXT NOT NULL,
+            contact_info TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -43,19 +37,6 @@ def init_db():
             detail TEXT NOT NULL,
             location TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    alert_columns = {row[1] for row in cursor.execute("PRAGMA table_info(alerts)").fetchall()}
-    if "location" not in alert_columns:
-        cursor.execute("ALTER TABLE alerts ADD COLUMN location TEXT")
-
-    # Walking to van table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS walking_to_van (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
 
@@ -101,6 +82,7 @@ def get_driver_poc():
         return {"driver_name": "", "contact_info": "", "updated_at": ""}
 
 def save_alert(title, detail, location=None):
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO alerts (title, detail, location) VALUES (?, ?, ?)", (title, detail, location))
@@ -110,26 +92,47 @@ def save_alert(title, detail, location=None):
     return alert_id
 
 def get_latest_alert():
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, title, detail, location, created_at FROM alerts ORDER BY id DESC LIMIT 1")
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
+    try:
+        cursor.execute("SELECT id, title, detail, location, created_at FROM alerts ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return {"id": row[0], "title": row[1], "detail": row[2], "location": row[3], "created_at": row[4]}
+    except Exception:
+        conn.close()
         return None
-    return {"id": row[0], "title": row[1], "detail": row[2], "location": row[3], "created_at": row[4]}
 
-def get_queue_data():
+def add_ride_request(name: str, contact: str, pickup: str, dropoff: str, status: str = 'CONFIRMED'):
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT r.id, COALESCE(u.name, 'Student'), COALESCE(u.contact, ''), r.pickup, r.dropoff, r.status, r.timestamp
-        FROM requests r
-        JOIN users u ON r.user_id = u.id
-        WHERE r.status IN ('CONFIRMED', 'WAITLIST', 'BOARDED')
-        ORDER BY r.id ASC
-    """)
-    rows = cursor.fetchall()
+        INSERT INTO ride_requests (student_name, contact_info, pickup, dropoff, status)
+        VALUES (?, ?, ?, ?, ?)
+    """, (name, contact or '', pickup, dropoff, status))
+    conn.commit()
+    req_id = cursor.lastrowid
+    conn.close()
+    return req_id
+
+def get_queue_data():
+    init_db()
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, student_name, contact_info, pickup, dropoff, status, created_at
+            FROM ride_requests
+            WHERE status IN ('CONFIRMED', 'WAITLIST', 'BOARDED')
+            ORDER BY id ASC
+        """)
+        rows = cursor.fetchall()
+    except Exception:
+        rows = []
     conn.close()
     
     confirmed = [r for r in rows if r[5] in ('CONFIRMED', 'BOARDED')]
@@ -139,48 +142,64 @@ def get_queue_data():
 def clear_requests_at_location(location: str):
     if not location:
         return 0
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE requests 
-        SET status = 'COMPLETED' 
-        WHERE LOWER(TRIM(pickup)) = LOWER(TRIM(?)) AND status IN ('CONFIRMED', 'WAITLIST', 'BOARDED')
-    """, (location,))
-    affected = cursor.rowcount
-    conn.commit()
+    try:
+        cursor.execute("""
+            UPDATE ride_requests 
+            SET status = 'COMPLETED' 
+            WHERE LOWER(TRIM(pickup)) = LOWER(TRIM(?)) AND status IN ('CONFIRMED', 'WAITLIST', 'BOARDED')
+        """, (location,))
+        affected = cursor.rowcount
+        conn.commit()
+    except Exception:
+        affected = 0
     conn.close()
     return affected
 
 def complete_single_request(request_id: int):
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("UPDATE requests SET status = 'COMPLETED' WHERE id = ?", (request_id,))
+    cursor.execute("UPDATE ride_requests SET status = 'COMPLETED' WHERE id = ?", (request_id,))
     conn.commit()
     conn.close()
 
-def get_walking_list():
+def add_active_walker(name: str, contact: str):
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT w.id, COALESCE(u.name, 'Student'), COALESCE(u.contact, ''), w.created_at
-        FROM walking_to_van w
-        JOIN users u ON w.user_id = u.id
-        ORDER BY w.id ASC
-    """)
-    rows = cursor.fetchall()
+    cursor.execute("INSERT INTO active_walkers (student_name, contact_info) VALUES (?, ?)", (name, contact or ''))
+    conn.commit()
+    walker_id = cursor.lastrowid
+    conn.close()
+    return walker_id
+
+def get_walking_list():
+    init_db()
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, student_name, contact_info, created_at FROM active_walkers ORDER BY id ASC")
+        rows = cursor.fetchall()
+    except Exception:
+        rows = []
     conn.close()
     return [{"id": r[0], "name": r[1], "contact": r[2], "time": r[3]} for r in rows]
 
 def clear_walking_to_van():
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM walking_to_van")
+    cursor.execute("DELETE FROM active_walkers")
     conn.commit()
     conn.close()
 
 def remove_single_walker(walker_id: int):
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM walking_to_van WHERE id = ?", (walker_id,))
+    cursor.execute("DELETE FROM active_walkers WHERE id = ?", (walker_id,))
     conn.commit()
     conn.close()
