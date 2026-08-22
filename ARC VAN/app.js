@@ -35,6 +35,7 @@ const studentQrUrl = document.querySelector('.student-qr-url');
 
 const driverAuthKey = 'arc-van-driver-auth';
 const driverPinKey = 'arc-van-driver-token';
+const studentProfileKey = 'arc-van-student-profile';
 
 let currentVanLocation = '';
 let studentSelectedPickup = '';
@@ -42,7 +43,52 @@ let socket = null;
 let heartbeatTimer = null;
 let currentAlertRawTime = null;
 
-// Convert ISO / UTC timestamps into user-friendly local time (e.g., "Just now", "3m ago", "Today at 2:15 PM")
+// --- PERSISTENT STUDENT PROFILE (REMEMBER ME) ---
+function loadSavedStudentProfile() {
+  try {
+    const raw = localStorage.getItem(studentProfileKey);
+    if (!raw) return { name: '', contact: '' };
+    const parsed = JSON.parse(raw);
+    return {
+      name: parsed.name || '',
+      contact: parsed.contact || ''
+    };
+  } catch (e) {
+    return { name: '', contact: '' };
+  }
+}
+
+function saveStudentProfile(name, contact) {
+  try {
+    const existing = loadSavedStudentProfile();
+    const updated = {
+      name: name !== undefined && name !== null ? name.trim() : existing.name,
+      contact: contact !== undefined && contact !== null ? contact.trim() : existing.contact
+    };
+    localStorage.setItem(studentProfileKey, JSON.stringify(updated));
+    populateStudentFields(updated);
+  } catch (e) {}
+}
+
+function populateStudentFields(profile) {
+  const p = profile || loadSavedStudentProfile();
+  
+  // Quick Ride Request inputs
+  const rideName = document.querySelector('#student-rider-name');
+  const rideContact = document.querySelector('#student-rider-contact');
+  if (rideName && !rideName.value && p.name) rideName.value = p.name;
+  if (rideContact && !rideContact.value && p.contact) rideContact.value = p.contact;
+
+  // Heading to van inputs
+  if (headingToVanForm) {
+    const walkName = headingToVanForm.querySelector('input[name="name"]');
+    const walkContact = headingToVanForm.querySelector('input[name="contact"]');
+    if (walkName && !walkName.value && p.name) walkName.value = p.name;
+    if (walkContact && !walkContact.value && p.contact) walkContact.value = p.contact;
+  }
+}
+
+// Convert ISO / UTC timestamps into user-friendly local time
 function formatTimestamp(isoString) {
   if (!isoString) return 'Waiting for driver...';
   try {
@@ -54,7 +100,6 @@ function formatTimestamp(isoString) {
     if (diffSecs < 60) return `${diffSecs}s ago`;
     if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
     
-    // If today, show time
     const isToday = new Date().toDateString() === d.toDateString();
     const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     if (isToday) return `Today at ${timeStr}`;
@@ -290,7 +335,21 @@ window.addEventListener('load', () => {
   updateDriverControls();
   initWebSocket();
   initQRCodes();
+  populateStudentFields();
   syncInitialData();
+
+  // Save student fields as they type
+  const rideName = document.querySelector('#student-rider-name');
+  const rideContact = document.querySelector('#student-rider-contact');
+  if (rideName) rideName.addEventListener('input', () => saveStudentProfile(rideName.value, null));
+  if (rideContact) rideContact.addEventListener('input', () => saveStudentProfile(null, rideContact.value));
+
+  if (headingToVanForm) {
+    const walkName = headingToVanForm.querySelector('input[name="name"]');
+    const walkContact = headingToVanForm.querySelector('input[name="contact"]');
+    if (walkName) walkName.addEventListener('input', () => saveStudentProfile(walkName.value, null));
+    if (walkContact) walkContact.addEventListener('input', () => saveStudentProfile(null, walkContact.value));
+  }
 
   document.querySelectorAll('[data-view]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -586,6 +645,9 @@ function submitStudentRideRequest(pickup, dropoff) {
     return;
   }
 
+  // Save for future requests
+  saveStudentProfile(name, contact);
+
   fetch('/api/request-ride', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -687,6 +749,9 @@ if (headingToVanForm) {
     const name = nameInput ? nameInput.value.trim() : '';
     const contact = contactInput ? contactInput.value.trim() : '';
     if (!name) return;
+
+    // Save for future requests
+    saveStudentProfile(name, contact);
     
     fetch('/api/student/heading-to-van', {
       method: 'POST',
@@ -695,7 +760,6 @@ if (headingToVanForm) {
     })
     .then((res) => res.json())
     .then(() => {
-      headingToVanForm.reset();
       showToast("Driver notified you're heading to the van!");
     })
     .catch(() => showToast('Failed to notify driver'));
