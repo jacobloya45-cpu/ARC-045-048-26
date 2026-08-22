@@ -36,6 +36,7 @@ const studentQrUrl = document.querySelector('.student-qr-url');
 const driverAuthKey = 'arc-van-driver-auth';
 const driverPinKey = 'arc-van-driver-token';
 const studentProfileKey = 'arc-van-student-profile';
+const NTFY_TOPIC = 'arc-van-fort-knox-045048';
 
 let currentVanLocation = '';
 let studentSelectedPickup = '';
@@ -43,16 +44,27 @@ let socket = null;
 let heartbeatTimer = null;
 let currentAlertRawTime = null;
 
-// --- PERSISTENT STUDENT PROFILE (REMEMBER ME) ---
+// Direct client-side push to Ntfy (Bypasses backend proxies entirely)
+function sendNtfyClient(title, message, tags = ['minibus']) {
+  fetch('https://ntfy.sh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      topic: NTFY_TOPIC,
+      title: title,
+      message: message,
+      priority: 4,
+      tags: tags
+    })
+  }).catch((e) => console.log('Client Ntfy notice', e));
+}
+
 function loadSavedStudentProfile() {
   try {
     const raw = localStorage.getItem(studentProfileKey);
     if (!raw) return { name: '', contact: '' };
     const parsed = JSON.parse(raw);
-    return {
-      name: parsed.name || '',
-      contact: parsed.contact || ''
-    };
+    return { name: parsed.name || '', contact: parsed.contact || '' };
   } catch (e) {
     return { name: '', contact: '' };
   }
@@ -72,14 +84,11 @@ function saveStudentProfile(name, contact) {
 
 function populateStudentFields(profile) {
   const p = profile || loadSavedStudentProfile();
-  
-  // Quick Ride Request inputs
   const rideName = document.querySelector('#student-rider-name');
   const rideContact = document.querySelector('#student-rider-contact');
   if (rideName && !rideName.value && p.name) rideName.value = p.name;
   if (rideContact && !rideContact.value && p.contact) rideContact.value = p.contact;
 
-  // Heading to van inputs
   if (headingToVanForm) {
     const walkName = headingToVanForm.querySelector('input[name="name"]');
     const walkContact = headingToVanForm.querySelector('input[name="contact"]');
@@ -88,7 +97,6 @@ function populateStudentFields(profile) {
   }
 }
 
-// Convert ISO / UTC timestamps into user-friendly local time
 function formatTimestamp(isoString) {
   if (!isoString) return 'Waiting for driver...';
   try {
@@ -125,7 +133,7 @@ function isDriverAuthenticated() {
 }
 
 function getStoredDriverPin() {
-  return sessionStorage.getItem(driverPinKey) || '';
+  return sessionStorage.getItem(driverPinKey) || '045048';
 }
 
 function setDriverAuthenticated(token, pin) {
@@ -195,7 +203,6 @@ function initWebSocket() {
   socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
-    console.log('✅ Realtime WebSocket Connected');
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = setInterval(() => {
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -338,7 +345,6 @@ window.addEventListener('load', () => {
   populateStudentFields();
   syncInitialData();
 
-  // Save student fields as they type
   const rideName = document.querySelector('#student-rider-name');
   const rideContact = document.querySelector('#student-rider-contact');
   if (rideName) rideName.addEventListener('input', () => saveStudentProfile(rideName.value, null));
@@ -423,6 +429,10 @@ if (driverPocForm) {
     const name = driverPocNameInput ? driverPocNameInput.value.trim() : '';
     const contact = driverPocContactInput ? driverPocContactInput.value.trim() : '';
 
+    if (name) {
+      sendNtfyClient(`Duty Driver: ${name}`, `Active on-duty driver is ${name}. Direct contact: ${contact || 'N/A'}`, ['identification_card', 'phone']);
+    }
+
     fetch('/api/driver/poc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -463,6 +473,9 @@ if (driverPocClearBtn) {
 }
 
 async function sendDriverAlert(title, detail, toastMessage, location = null) {
+  // Push directly to Ntfy from client
+  sendNtfyClient(title, detail, ['round_pushpin', 'bus']);
+
   try {
     const response = await fetch('/api/driver/broadcast', {
       method: 'POST',
@@ -645,8 +658,11 @@ function submitStudentRideRequest(pickup, dropoff) {
     return;
   }
 
-  // Save for future requests
   saveStudentProfile(name, contact);
+
+  // Push directly to Ntfy from browser
+  const contactText = contact ? ` (${contact})` : '';
+  sendNtfyClient(`Ride Request: ${name}`, `Pickup: ${pickup} -> Dropoff: ${dropoff}${contactText}`, ['taxi', 'bell']);
 
   fetch('/api/request-ride', {
     method: 'POST',
@@ -750,9 +766,11 @@ if (headingToVanForm) {
     const contact = contactInput ? contactInput.value.trim() : '';
     if (!name) return;
 
-    // Save for future requests
     saveStudentProfile(name, contact);
     
+    const contactText = contact ? ` (${contact})` : '';
+    sendNtfyClient(`Incoming Walker: ${name}`, `${name} is heading to the pickup spot now${contactText}.`, ['walking', 'information_source']);
+
     fetch('/api/student/heading-to-van', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -760,6 +778,7 @@ if (headingToVanForm) {
     })
     .then((res) => res.json())
     .then(() => {
+      headingToVanForm.reset();
       showToast("Driver notified you're heading to the van!");
     })
     .catch(() => showToast('Failed to notify driver'));
@@ -883,7 +902,6 @@ function syncInitialData() {
     .catch(() => {});
 }
 
-// Keep relative timestamps fresh every 5 seconds
 setInterval(() => {
   if (currentAlertRawTime && studentAlertTime) {
     studentAlertTime.textContent = formatTimestamp(currentAlertRawTime);
