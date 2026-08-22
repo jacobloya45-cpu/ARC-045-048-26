@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timezone
 
 DB_NAME = "shuttle.db"
 
@@ -6,7 +7,6 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Standalone requests table with embedded contact details
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS ride_requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,43 +15,40 @@ def init_db():
             pickup TEXT NOT NULL,
             dropoff TEXT NOT NULL,
             status TEXT DEFAULT 'CONFIRMED',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT
         )
     """)
 
-    # Standalone active walkers table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS active_walkers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_name TEXT NOT NULL,
             contact_info TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT
         )
     """)
 
-    # Alerts table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             detail TEXT NOT NULL,
             location TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT
         )
     """)
 
-    # Driver POC table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS driver_poc (
             id INTEGER PRIMARY KEY,
             driver_name TEXT,
             contact_info TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TEXT
         )
     """)
     cursor.execute("SELECT COUNT(*) FROM driver_poc WHERE id = 1")
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
+        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info, updated_at) VALUES (1, '', '', ?)", (datetime.now(timezone.utc).isoformat(),))
 
     conn.commit()
     conn.close()
@@ -60,9 +57,10 @@ def save_driver_poc(driver_name: str, contact_info: str):
     init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("UPDATE driver_poc SET driver_name = ?, contact_info = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", (driver_name, contact_info))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor.execute("UPDATE driver_poc SET driver_name = ?, contact_info = ?, updated_at = ? WHERE id = 1", (driver_name, contact_info, now_iso))
     if cursor.rowcount == 0:
-        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info) VALUES (1, ?, ?)", (driver_name, contact_info))
+        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info, updated_at) VALUES (1, ?, ?, ?)", (driver_name, contact_info, now_iso))
     conn.commit()
     conn.close()
 
@@ -85,7 +83,8 @@ def save_alert(title, detail, location=None):
     init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO alerts (title, detail, location) VALUES (?, ?, ?)", (title, detail, location))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor.execute("INSERT INTO alerts (title, detail, location, created_at) VALUES (?, ?, ?, ?)", (title, detail, location, now_iso))
     conn.commit()
     alert_id = cursor.lastrowid
     conn.close()
@@ -110,10 +109,11 @@ def add_ride_request(name: str, contact: str, pickup: str, dropoff: str, status:
     init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    now_iso = datetime.now(timezone.utc).isoformat()
     cursor.execute("""
-        INSERT INTO ride_requests (student_name, contact_info, pickup, dropoff, status)
-        VALUES (?, ?, ?, ?, ?)
-    """, (name, contact or '', pickup, dropoff, status))
+        INSERT INTO ride_requests (student_name, contact_info, pickup, dropoff, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (name, contact or '', pickup, dropoff, status, now_iso))
     conn.commit()
     req_id = cursor.lastrowid
     conn.close()
@@ -170,7 +170,8 @@ def add_active_walker(name: str, contact: str):
     init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO active_walkers (student_name, contact_info) VALUES (?, ?)", (name, contact or ''))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor.execute("INSERT INTO active_walkers (student_name, contact_info, created_at) VALUES (?, ?, ?)", (name, contact or '', now_iso))
     conn.commit()
     walker_id = cursor.lastrowid
     conn.close()
