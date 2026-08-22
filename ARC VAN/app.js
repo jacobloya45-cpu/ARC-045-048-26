@@ -40,6 +40,24 @@ let currentVanLocation = '';
 let studentSelectedPickup = '';
 let socket = null;
 let heartbeatTimer = null;
+let currentAlertRawTime = null;
+
+// Dynamic timestamp formatting (e.g., "Just now", "4m ago", or "2:15 PM")
+function formatTimestamp(isoString) {
+  if (!isoString) return 'Active';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    const diffSecs = Math.floor((Date.now() - d.getTime()) / 1000);
+
+    if (diffSecs < 60) return 'Just now';
+    if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
+    if (diffSecs < 86400) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch (e) {
+    return 'Active';
+  }
+}
 
 function initQRCodes() {
   const currentUrl = window.location.origin;
@@ -176,19 +194,17 @@ function initWebSocket() {
 }
 
 function renderReceivedAlert(alert) {
+  if (!alert) return;
+  currentAlertRawTime = alert.created_at || new Date().toISOString();
+
   playAlertTone();
   if (studentAlertTitle) studentAlertTitle.textContent = displayVanName(alert.title);
   if (studentAlertDetail) studentAlertDetail.textContent = displayVanName(alert.detail);
-  if (studentAlertTime) studentAlertTime.textContent = 'Just now';
+  if (studentAlertTime) studentAlertTime.textContent = formatTimestamp(currentAlertRawTime);
 
   const departureMatch = alert.title && alert.title.match(/departs at (.+)$/i);
   if (departureMatch && studentDepartureTime) {
     studentDepartureTime.textContent = departureMatch[1];
-  }
-
-  if (alert.location && studentVanLocation) {
-    studentVanLocation.textContent = alert.location;
-    if (studentVanLocationTime) studentVanLocationTime.textContent = 'Updated just now';
   }
 
   showToast(`🚐 ${alert.title}`);
@@ -788,12 +804,20 @@ function syncInitialData() {
     .then((res) => res.json())
     .then((alert) => {
       if (alert && alert.id) {
+        currentAlertRawTime = alert.created_at;
         if (studentAlertTitle) studentAlertTitle.textContent = displayVanName(alert.title);
         if (studentAlertDetail) studentAlertDetail.textContent = displayVanName(alert.detail);
-        if (studentAlertTime) studentAlertTime.textContent = 'Active';
+        if (studentAlertTime) studentAlertTime.textContent = formatTimestamp(alert.created_at);
       }
     })
     .catch(() => {});
 }
+
+// Keep relative timestamps ("4m ago") fresh every 10s
+setInterval(() => {
+  if (currentAlertRawTime && studentAlertTime) {
+    studentAlertTime.textContent = formatTimestamp(currentAlertRawTime);
+  }
+}, 10000);
 
 setInterval(syncInitialData, 4000);
