@@ -16,7 +16,7 @@ const headingToVanForm = document.querySelector('#heading-to-van-form');
 const driverRequestList = document.querySelector('#driver-request-list');
 const driverWalkerList = document.querySelector('#driver-walker-list');
 const clearAllWalkersBtn = document.querySelector('#clear-all-walkers-btn');
-const testNtfyBtn = document.querySelector('#test-ntfy-btn');
+const testTelegramBtn = document.querySelector('#test-telegram-btn');
 
 const driverPocForm = document.querySelector('#driver-poc-form');
 const driverPocNameInput = document.querySelector('#driver-poc-name');
@@ -118,7 +118,7 @@ function isDriverAuthenticated() {
 }
 
 function getStoredDriverPin() {
-  return sessionStorage.getItem(driverPinKey) || '045048';
+  return sessionStorage.getItem(driverPinKey) || '';
 }
 
 function setDriverAuthenticated(token, pin) {
@@ -134,7 +134,7 @@ function setDriverAuthenticated(token, pin) {
 function updateDriverControls() {
   const driverView = document.querySelector('#driver-view');
   if (!driverView) return;
-  const controls = driverView.querySelectorAll('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, .request-alert-btn, #clear-all-walkers-btn, #test-ntfy-btn, #driver-poc-form input, #driver-poc-form button');
+  const controls = driverView.querySelectorAll('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, .request-alert-btn, #clear-all-walkers-btn, #test-telegram-btn, #driver-poc-form input, #driver-poc-form button');
   const authed = isDriverAuthenticated();
   controls.forEach((el) => {
     try { el.disabled = !authed; } catch (e) {}
@@ -280,7 +280,7 @@ function renderDriverPOC(poc) {
     if (contact) {
       studentDisplayDriverContact.innerHTML = `Direct Contact: <strong style="color:var(--coral); font-size: 14px;">${contact}</strong>`;
     } else {
-      studentDisplayDriverContact.textContent = 'No direct phone/signal listed. Use the alert and request buttons below.';
+      studentDisplayDriverContact.textContent = 'No direct phone/signal listed. Use the alerts and request buttons below.';
     }
   }
 
@@ -397,7 +397,7 @@ window.addEventListener('load', () => {
   if (driverView) {
     driverView.addEventListener('click', (e) => {
       if (isDriverAuthenticated()) return;
-      const target = e.target.closest('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, #clear-all-walkers-btn, #test-ntfy-btn, #driver-poc-form button');
+      const target = e.target.closest('.location-btn, .destination-btn, #send-other-alert, #send-destination-other, #announce-btn, .departure-option, #departure-alert-btn, #van-full-return-btn, #no-rides-btn, #clear-all-walkers-btn, #test-telegram-btn, #driver-poc-form button');
       if (target) {
         e.preventDefault();
         e.stopPropagation();
@@ -407,17 +407,24 @@ window.addEventListener('load', () => {
   }
 });
 
-// Diagnostic Button
-if (testNtfyBtn) {
-  testNtfyBtn.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
-    fetch('/api/test-ntfy')
+// Telegram Diagnostic Test
+if (testTelegramBtn) {
+  testTelegramBtn.addEventListener('click', () => {
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
+    fetch('/api/test-telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: getStoredDriverPin() })
+    })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          showToast('✅ Ntfy push delivered! (200 OK)');
+          showToast('✅ Telegram message posted successfully (200 OK)');
         } else {
-          showToast(`❌ Ntfy Error: HTTP ${data.status} - ${data.detail || 'Failed'}`);
+          showToast(`❌ Telegram Error: ${data.detail || data.status}`);
         }
       })
       .catch((err) => showToast(`❌ Connection error: ${err.message}`));
@@ -427,7 +434,10 @@ if (testNtfyBtn) {
 if (driverPocForm) {
   driverPocForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     const name = driverPocNameInput ? driverPocNameInput.value.trim() : '';
     const contact = driverPocContactInput ? driverPocContactInput.value.trim() : '';
 
@@ -443,7 +453,7 @@ if (driverPocForm) {
     .then((res) => res.json())
     .then((data) => {
       renderDriverPOC(data.poc);
-      showToast('Driver POC published & sent to Ntfy!');
+      showToast('Driver POC published & sent to Telegram!');
     })
     .catch(() => showToast('Failed to save POC.'));
   });
@@ -451,7 +461,10 @@ if (driverPocForm) {
 
 if (driverPocClearBtn) {
   driverPocClearBtn.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     fetch('/api/driver/poc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -471,6 +484,10 @@ if (driverPocClearBtn) {
 }
 
 async function sendDriverAlert(title, detail, toastMessage, location = null) {
+  if (!isDriverAuthenticated()) {
+    showPinModal('Driver PIN required');
+    return;
+  }
   try {
     const response = await fetch('/api/driver/broadcast', {
       method: 'POST',
@@ -536,7 +553,10 @@ function sendLocationUpdate(destination) {
 }
 
 document.querySelectorAll('#driver-view .location-btn').forEach((button) => button.addEventListener('click', () => {
-  if (!isDriverAuthenticated()) return;
+  if (!isDriverAuthenticated()) {
+    showPinModal('Driver PIN required');
+    return;
+  }
   const otherLocation = document.querySelector('#other-location');
   if (button.dataset.location === 'Other') {
     if (otherLocation) {
@@ -554,7 +574,10 @@ document.querySelectorAll('#driver-view .location-btn').forEach((button) => butt
 const sendOtherAlertBtn = document.querySelector('#send-other-alert');
 if (sendOtherAlertBtn) {
   sendOtherAlertBtn.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     const input = document.querySelector('#other-location-input');
     const location = input ? input.value.trim() : '';
     if (!location) {
@@ -566,7 +589,10 @@ if (sendOtherAlertBtn) {
 }
 
 document.querySelectorAll('#driver-view .destination-btn').forEach((button) => button.addEventListener('click', () => {
-  if (!isDriverAuthenticated()) return;
+  if (!isDriverAuthenticated()) {
+    showPinModal('Driver PIN required');
+    return;
+  }
   const otherDestination = document.querySelector('#other-destination');
   if (button.dataset.location === 'Other') {
     if (otherDestination) {
@@ -584,7 +610,10 @@ document.querySelectorAll('#driver-view .destination-btn').forEach((button) => b
 const sendDestOtherBtn = document.querySelector('#send-destination-other');
 if (sendDestOtherBtn) {
   sendDestOtherBtn.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     const input = document.querySelector('#other-destination-input');
     const destination = input ? input.value.trim() : '';
     if (!destination) {
@@ -597,7 +626,10 @@ if (sendDestOtherBtn) {
 
 if (departureAlertButton) {
   departureAlertButton.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     const activeOption = document.querySelector('.departure-option.active');
     const waitTime = activeOption ? activeOption.dataset.wait : '5';
     const departure = new Date(Date.now() + Number(waitTime) * 60000);
@@ -613,7 +645,10 @@ if (departureAlertButton) {
 
 if (vanFullReturnButton) {
   vanFullReturnButton.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     sendDriverAlert(
       '045/048 Van is currently full',
       'The van is at capacity. The driver will return shortly for more rides.',
@@ -624,7 +659,10 @@ if (vanFullReturnButton) {
 
 if (noRidesButton) {
   noRidesButton.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     sendDriverAlert(
       'No rides available right now',
       'Service is paused. Please check back later for the next available ride.',
@@ -634,7 +672,10 @@ if (noRidesButton) {
 }
 
 document.querySelectorAll('.departure-option').forEach((button) => button.addEventListener('click', () => {
-  if (!isDriverAuthenticated()) return;
+  if (!isDriverAuthenticated()) {
+    showPinModal('Driver PIN required');
+    return;
+  }
   document.querySelectorAll('.departure-option').forEach((option) => option.classList.remove('active'));
   button.classList.add('active');
   if (departureTime) departureTime.textContent = `${button.dataset.wait} min`;
@@ -775,7 +816,10 @@ if (headingToVanForm) {
 
 if (clearAllWalkersBtn) {
   clearAllWalkersBtn.addEventListener('click', () => {
-    if (!isDriverAuthenticated()) return;
+    if (!isDriverAuthenticated()) {
+      showPinModal('Driver PIN required');
+      return;
+    }
     fetch('/api/driver/clear-walking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -822,6 +866,10 @@ function renderDriverWalkers(walkers) {
 
   driverWalkerList.querySelectorAll('.arrive-walker-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      if (!isDriverAuthenticated()) {
+        showPinModal('Driver PIN required');
+        return;
+      }
       const walkerId = btn.dataset.walkerid;
       fetch('/api/driver/remove-walker', {
         method: 'POST',
@@ -854,6 +902,10 @@ function renderDriverRequests(requests) {
 
   driverRequestList.querySelectorAll('.complete-request-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      if (!isDriverAuthenticated()) {
+        showPinModal('Driver PIN required');
+        return;
+      }
       const reqId = btn.dataset.reqid;
       fetch('/api/driver/complete-request', {
         method: 'POST',
