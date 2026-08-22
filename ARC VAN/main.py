@@ -17,19 +17,43 @@ MAX_CAPACITY = 15
 
 # --- TELEGRAM CONFIGURATION ---
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8760268822:AAHBjq_ckgCoZQ1cYybg6Us25A4X-PSTIOs")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@YOUR_CHANNEL_USERNAME")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 ACTIVE_POC = database.get_driver_poc()
 
+async def resolve_chat_id() -> str:
+    """Auto-detects the channel's internal numeric chat ID from recent bot updates."""
+    global TELEGRAM_CHAT_ID
+    if TELEGRAM_CHAT_ID:
+        return TELEGRAM_CHAT_ID
+        
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+        async with httpx.AsyncClient(verify=False, timeout=6.0) as client:
+            resp = await client.get(url)
+            data = resp.json()
+            if data.get("ok") and data.get("result"):
+                for upd in reversed(data["result"]):
+                    # Look for channel post or chat member addition
+                    chat = upd.get("channel_post", {}).get("chat") or upd.get("my_chat_member", {}).get("chat") or upd.get("message", {}).get("chat")
+                    if chat and chat.get("id"):
+                        TELEGRAM_CHAT_ID = str(chat["id"])
+                        print(f"🎯 [AUTO-RESOLVED CHAT ID]: {TELEGRAM_CHAT_ID}")
+                        return TELEGRAM_CHAT_ID
+    except Exception as e:
+        print(f"⚠️ Error resolving chat ID: {e}")
+    return TELEGRAM_CHAT_ID
+
 async def send_telegram_alert(text: str) -> dict:
     """Direct broadcast to Telegram Channel."""
-    if "YOUR_CHANNEL" in TELEGRAM_CHAT_ID:
-        print("⚠️ Telegram channel username not set yet.")
-        return {"success": False, "status": 400, "detail": "Missing Telegram Channel @username"}
+    chat_id = await resolve_chat_id()
+    if not chat_id:
+        print("⚠️ Could not detect chat ID. Send a test message in the channel and click Test again.")
+        return {"success": False, "status": 400, "detail": "Post any message into your Telegram channel first, then try again."}
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True
@@ -38,7 +62,7 @@ async def send_telegram_alert(text: str) -> dict:
     try:
         async with httpx.AsyncClient(verify=False, timeout=8.0) as client:
             resp = await client.post(url, json=payload)
-            print(f"🚀 [TELEGRAM ALERT] HTTP {resp.status_code}")
+            print(f"🚀 [TELEGRAM ALERT] HTTP {resp.status_code} to {chat_id}")
             return {"success": resp.status_code == 200, "status": resp.status_code, "detail": resp.text}
     except Exception as e:
         print(f"❌ [TELEGRAM ERROR]: {e}")
@@ -139,7 +163,7 @@ def health():
 async def test_telegram(payload: TestTelegramPayload):
     if payload.pin != DRIVER_PIN:
         raise HTTPException(status_code=403, detail="Invalid Driver PIN")
-    msg = "🔔 <b>ARC Shuttle Diagnostic Test</b>\n\nTelegram notifications are fully connected and active!"
+    msg = "🔔 <b>ARC Shuttle Diagnostic Test</b>\n\nTelegram notifications are active and connected!"
     res = await send_telegram_alert(msg)
     return res
 
