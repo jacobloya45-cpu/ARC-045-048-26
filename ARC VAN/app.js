@@ -42,18 +42,24 @@ let socket = null;
 let heartbeatTimer = null;
 let currentAlertRawTime = null;
 
-// Dynamic timestamp formatting (e.g., "Just now", "4m ago", or "2:15 PM")
+// Convert ISO / UTC timestamps into user-friendly local time (e.g., "Just now", "3m ago", "Today at 2:15 PM")
 function formatTimestamp(isoString) {
-  if (!isoString) return 'Active';
+  if (!isoString) return 'Waiting for driver...';
   try {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return isoString;
     const diffSecs = Math.floor((Date.now() - d.getTime()) / 1000);
 
-    if (diffSecs < 60) return 'Just now';
+    if (diffSecs < 10) return 'Just now';
+    if (diffSecs < 60) return `${diffSecs}s ago`;
     if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
-    if (diffSecs < 86400) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    
+    // If today, show time
+    const isToday = new Date().toDateString() === d.toDateString();
+    const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (isToday) return `Today at ${timeStr}`;
+    
+    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${timeStr}`;
   } catch (e) {
     return 'Active';
   }
@@ -813,11 +819,11 @@ function syncInitialData() {
     .catch(() => {});
 }
 
-// Keep relative timestamps ("4m ago") fresh every 10s
+// Keep relative timestamps fresh every 5 seconds
 setInterval(() => {
   if (currentAlertRawTime && studentAlertTime) {
     studentAlertTime.textContent = formatTimestamp(currentAlertRawTime);
   }
-}, 10000);
+}, 5000);
 
 setInterval(syncInitialData, 4000);
