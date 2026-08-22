@@ -1,6 +1,5 @@
 import os
 import json
-import base64
 import urllib.request
 import urllib.error
 from typing import List
@@ -20,30 +19,31 @@ NTFY_TOPIC = "arc-van-fort-knox-045048"
 
 ACTIVE_POC = database.get_driver_poc()
 
-def publish_ntfy(title: str, message: str, tags: str = "minibus"):
+def publish_ntfy(title: str, message: str, tags: list = None):
     """
-    Sends alerts to Ntfy.sh with RFC-2047 header encoding to support
-    emojis and Unicode without crashing Python's latin-1 HTTP header parser.
+    Sends alerts to ntfy.sh via JSON POST body.
+    This bypasses all HTTP header encoding issues and supports emojis cleanly.
     """
     try:
-        clean_title = (title or "ARC Van Alert").strip()
-        # Encode title in Base64 RFC 2047 format for safe HTTP header transmission
-        b64_title = base64.b64encode(clean_title.encode("utf-8")).decode("ascii")
-        encoded_title = f"=?utf-8?b?{b64_title}?="
+        payload = json.dumps({
+            "topic": NTFY_TOPIC,
+            "title": title or "ARC Van Alert",
+            "message": message or "",
+            "priority": 4,
+            "tags": tags or ["minibus"]
+        }).encode("utf-8")
 
         req = urllib.request.Request(
-            f"https://ntfy.sh/{NTFY_TOPIC}",
-            data=message.encode("utf-8"),
+            "https://ntfy.sh",
+            data=payload,
             headers={
-                "Title": encoded_title,
-                "Priority": "high",
-                "Tags": tags,
+                "Content-Type": "application/json",
                 "User-Agent": "ARC-Van-Tracker/1.0"
             },
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            print(f"✅ [NTFY SUCCESS] Status {resp.status}: '{clean_title}'")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            print(f"✅ [NTFY SUCCESS] {resp.status} - '{title}'")
             return True
     except Exception as e:
         print(f"❌ [NTFY FAILED] {e}")
@@ -162,9 +162,9 @@ async def set_poc(payload: DriverPOCPayload):
     
     if d_name:
         publish_ntfy(
-            f"Duty Driver Updated: {d_name}",
-            f"On-duty driver is now {d_name}. Contact: {c_info or 'N/A'}",
-            "identification_card,phone"
+            f"Duty Driver: {d_name}",
+            f"On-duty driver is {d_name}. Direct contact: {c_info or 'N/A'}",
+            ["identification_card", "phone"]
         )
 
     await manager.broadcast({
@@ -192,7 +192,7 @@ async def broadcast_alert(alert: AlertPayload):
         raise HTTPException(status_code=403, detail="Invalid Driver PIN")
 
     loc = alert.location or alert.current_stop
-    subject = alert.title or f"Van Location: {loc}"
+    subject = alert.title or f"🚐 Van Location: {loc}"
     body = alert.detail or f"045/048 Van is currently at {loc}."
 
     database.clear_requests_at_location(loc)
@@ -200,8 +200,8 @@ async def broadcast_alert(alert: AlertPayload):
     latest = database.get_latest_alert()
     queue_data = database.get_queue_data()
 
-    # Publish location/departure to Ntfy
-    publish_ntfy(subject, body, "round_pushpin,bus")
+    # Instant JSON push to Ntfy
+    publish_ntfy(subject, body, ["round_pushpin", "bus"])
 
     await manager.broadcast({
         "type": "NEW_ALERT",
@@ -264,11 +264,11 @@ async def request_ride(req: RideRequest):
     )
 
     contact_text = f" ({req.contact.strip()})" if req.contact else ""
-    # Push new ride request notification to Ntfy
+    # Push ride request notification to Ntfy
     publish_ntfy(
-        f"Ride Request: {req.name.strip()}",
-        f"Pickup: {req.pickup.strip()} -> Dropoff: {req.dropoff.strip()}{contact_text}",
-        "taxi,bell"
+        f"🚖 Ride Request: {req.name.strip()}",
+        f"Pickup: {req.pickup.strip()} ➔ Dropoff: {req.dropoff.strip()}{contact_text}",
+        ["taxi", "bell"]
     )
 
     queue_data = database.get_queue_data()
@@ -295,11 +295,11 @@ async def heading_to_van(payload: WalkerPayload):
     )
 
     contact_text = f" ({payload.contact.strip()})" if payload.contact else ""
-    # Push walker alert to Ntfy
+    # Push walker notification to Ntfy
     publish_ntfy(
-        f"Incoming Walker: {payload.name.strip()}",
-        f"{payload.name.strip()} is heading to the van right now{contact_text}.",
-        "walking,information_source"
+        f"🚶 Incoming Walker: {payload.name.strip()}",
+        f"{payload.name.strip()} is heading to the pickup spot now{contact_text}.",
+        ["walking", "information_source"]
     )
 
     walkers = database.get_walking_list()
