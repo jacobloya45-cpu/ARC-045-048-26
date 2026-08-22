@@ -1,8 +1,7 @@
 import os
 import json
 import ssl
-import asyncio
-import urllib.request
+import http.client
 import urllib.parse
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -18,49 +17,41 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
-# Single Universal Topic for ALL Driver & Student actions
+# Unified topic
 NTFY_TOPIC = "arc-van-knox-045048"
 
 ACTIVE_POC = database.get_driver_poc()
 
-ssl_ctx = ssl.create_default_context()
-ssl_ctx.check_hostname = False
-ssl_ctx.verify_mode = ssl.CERT_NONE
-
-def sync_send_ntfy(title: str, message: str, tags: str = "minibus"):
-    """
-    Sends alerts to Ntfy via URL parameters.
-    Bypasses all HTTP header filters and CORS restrictions.
-    """
+# Direct HTTPS client to bypass all urllib/FastAPI async hanging issues
+def send_to_ntfy(title: str, message: str, tags: str = "minibus") -> bool:
     try:
-        clean_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Shuttle Alert"
-        params = urllib.parse.urlencode({
-            "title": clean_title,
-            "tags": tags or "minibus",
-            "priority": "urgent"
-        })
-        url = f"https://ntfy.sh/{NTFY_TOPIC}?{params}"
-        body = (message or "ARC Shuttle update").encode("utf-8")
+        clean_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
+        clean_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
         
-        req = urllib.request.Request(
-            url,
-            data=body,
-            headers={
-                "Content-Type": "text/plain; charset=utf-8",
-                "User-Agent": "ARC-Van/1.0"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=5, context=ssl_ctx) as resp:
-            print(f"✅ [NTFY SERVER POST {resp.status}]: {clean_title}")
-            return {"success": True, "status": resp.status}
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        conn = http.client.HTTPSConnection("ntfy.sh", 443, context=ctx, timeout=8)
+        
+        query_path = f"/{NTFY_TOPIC}?title={urllib.parse.quote(clean_title)}&tags={urllib.parse.quote(clean_tags)}&priority=urgent"
+        body_data = (message or "ARC Shuttle Alert").encode("utf-8")
+        
+        headers = {
+            "Content-Type": "text/plain; charset=utf-8",
+            "User-Agent": "ARC-Van-Tracker/1.0"
+        }
+        
+        conn.request("POST", query_path, body=body_data, headers=headers)
+        response = conn.getresponse()
+        resp_body = response.read().decode("utf-8", errors="ignore")
+        conn.close()
+        
+        print(f"🚀 [NTFY PUSH] HTTP {response.status} | Title: {clean_title} | Response: {resp_body[:60]}")
+        return response.status in (200, 201, 202)
     except Exception as e:
-        print(f"❌ [NTFY SERVER ERROR]: {e}")
-        return {"success": False, "error": str(e)}
-
-async def publish_ntfy(title: str, message: str, tags: str = "minibus"):
-    """Dispatches in background thread without blocking the web server"""
-    return await asyncio.to_thread(sync_send_ntfy, title, message, tags)
+        print(f"❌ [NTFY ERROR]: {e}")
+        return False
 
 class ConnectionManager:
     def __init__(self):
@@ -87,7 +78,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- Pydantic Data Models ---
+# --- Data Models ---
 class PinVerifyPayload(BaseModel):
     pin: str
 
@@ -114,6 +105,11 @@ class RideRequest(BaseModel):
 class WalkerPayload(BaseModel):
     name: str
     contact: str | None = ""
+
+class NtfyDirectPayload(BaseModel):
+    title: str
+    message: str
+    tags: str | None = "minibus"
 
 class CompleteRequestPayload(BaseModel):
     pin: str | None = "045048"
@@ -150,10 +146,16 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 def health():
     return {"status": "healthy"}
 
+# Dedicated server-side proxy so frontend never gets blocked by CORS or ad-blockers
+@app.post("/api/ntfy-push")
+def proxy_ntfy_push(payload: NtfyDirectPayload):
+    success = send_to_ntfy(payload.title, payload.message, payload.tags or "minibus")
+    return {"success": success}
+
 @app.get("/api/test-ntfy")
-async def test_ntfy():
-    res = await publish_ntfy("ARC Van Test Alert", "Test push notification to ntfy.sh", "bell,white_check_mark")
-    return res
+def test_ntfy():
+    success = send_to_ntfy("ARC Van Test Ping", "If you see this, notifications are working!", "bell,white_check_mark")
+    return {"success": success}
 
 @app.post("/api/driver/verify-pin")
 def verify_driver_pin(payload: PinVerifyPayload):
@@ -176,13 +178,13 @@ async def set_poc(payload: DriverPOCPayload):
     ACTIVE_POC = {"driver_name": d_name, "contact_info": c_info, "updated_at": "Just now"}
     
     if d_name:
-        await publish_ntfy(
+        send_to_ntfy(
             f"Duty Driver: {d_name}",
-            f"On-duty driver is {d_name}. Contact: {c_info or 'N/A'}",
+            f"Active on-duty driver is {d_name}. Contact: {c_info or 'N/A'}",
             "identification_card,phone"
         )
     else:
-        await publish_ntfy("Duty Driver Cleared", "Driver contact has been reset.", "heavy_minus_sign")
+        send_to_ntfy("Duty Driver Cleared", "Driver contact has been reset.", "heavy_minus_sign")
 
     await manager.broadcast({
         "type": "POC_UPDATED",
@@ -214,8 +216,7 @@ async def broadcast_alert(alert: AlertPayload):
     latest = database.get_latest_alert()
     queue_data = database.get_queue_data()
 
-    # Publish Van Location / Departure Alert
-    await publish_ntfy(subject, body, "round_pushpin,bus")
+    send_to_ntfy(subject, body, "round_pushpin,bus")
 
     await manager.broadcast({
         "type": "NEW_ALERT",
@@ -240,7 +241,7 @@ def driver_requests(payload: DriverRequestQuery):
 @app.post("/api/driver/complete-request")
 async def complete_request(payload: CompleteRequestPayload):
     database.complete_single_request(payload.request_id)
-    await publish_ntfy("Passenger Picked Up", f"Ride request #{payload.request_id} completed.", "white_check_mark")
+    send_to_ntfy("Passenger Picked Up", f"Ride request #{payload.request_id} picked up.", "white_check_mark")
     
     queue_data = database.get_queue_data()
     await manager.broadcast({
@@ -252,7 +253,7 @@ async def complete_request(payload: CompleteRequestPayload):
 @app.post("/api/driver/remove-walker")
 async def remove_walker(payload: RemoveWalkerPayload):
     database.remove_single_walker(payload.walker_id)
-    await publish_ntfy("Walker Arrived", "Student has boarded the van.", "white_check_mark")
+    send_to_ntfy("Walker Boarded", "Student has boarded the van.", "white_check_mark")
     
     walkers = database.get_walking_list()
     await manager.broadcast({
@@ -276,8 +277,7 @@ async def request_ride(req: RideRequest):
     )
 
     contact_text = f" ({req.contact.strip()})" if req.contact else ""
-    # Push ride request notification to Ntfy
-    await publish_ntfy(
+    send_to_ntfy(
         f"Ride Request: {req.name.strip()}",
         f"Pickup: {req.pickup.strip()} -> Dropoff: {req.dropoff.strip()}{contact_text}",
         "taxi,bell"
@@ -307,8 +307,7 @@ async def heading_to_van(payload: WalkerPayload):
     )
 
     contact_text = f" ({payload.contact.strip()})" if payload.contact else ""
-    # Push incoming walker notification to Ntfy
-    await publish_ntfy(
+    send_to_ntfy(
         f"Incoming Walker: {payload.name.strip()}",
         f"{payload.name.strip()} is walking to the van now{contact_text}.",
         "walking,information_source"
@@ -327,7 +326,7 @@ async def heading_to_van(payload: WalkerPayload):
 @app.post("/api/driver/clear-walking")
 async def clear_walking(payload: UpdateStatus):
     database.clear_walking_to_van()
-    await publish_ntfy("Walkers Cleared", "Driver cleared the incoming arrivals list.", "broom")
+    send_to_ntfy("Walkers Cleared", "Driver cleared the incoming arrivals list.", "broom")
     await manager.broadcast({"type": "WALKERS_UPDATED", "walkers": [], "count": 0})
     return {"success": True}
 
