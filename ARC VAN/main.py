@@ -15,34 +15,33 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
-# Unique, unthrottled private topic
-NTFY_TOPIC = "arc-045-048-shuttle-knox-v9x7"
+# --- TELEGRAM CONFIGURATION ---
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8760268822:AAHBjq_ckgCoZQ1cYybg6Us25A4X-PSTIOs")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "@YOUR_CHANNEL_USERNAME")
 
 ACTIVE_POC = database.get_driver_poc()
 
-async def send_to_ntfy(title: str, message: str, tags: str = "minibus") -> dict:
-    """
-    Robust async delivery to ntfy.sh using httpx.
-    """
-    clean_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
-    clean_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
-    url = f"https://ntfy.sh/{NTFY_TOPIC}"
-    
-    headers = {
-        "Title": clean_title,
-        "Priority": "urgent",
-        "Tags": clean_tags,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Content-Type": "text/plain; charset=utf-8"
+async def send_telegram_alert(text: str) -> dict:
+    """Direct broadcast to Telegram Channel."""
+    if "YOUR_CHANNEL" in TELEGRAM_CHAT_ID:
+        print("⚠️ Telegram channel username not set yet.")
+        return {"success": False, "status": 400, "detail": "Missing Telegram Channel @username"}
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
     }
 
     try:
         async with httpx.AsyncClient(verify=False, timeout=8.0) as client:
-            resp = await client.post(url, content=(message or "Shuttle Update").encode("utf-8"), headers=headers)
-            print(f"🚀 [NTFY PUSH] HTTP {resp.status_code} | Title: {clean_title}")
-            return {"success": resp.status_code in (200, 201, 202), "status": resp.status_code, "detail": resp.text}
+            resp = await client.post(url, json=payload)
+            print(f"🚀 [TELEGRAM ALERT] HTTP {resp.status_code}")
+            return {"success": resp.status_code == 200, "status": resp.status_code, "detail": resp.text}
     except Exception as e:
-        print(f"❌ [NTFY EXCEPTION]: {e}")
+        print(f"❌ [TELEGRAM ERROR]: {e}")
         return {"success": False, "status": 500, "detail": str(e)}
 
 class ConnectionManager:
@@ -70,17 +69,17 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- Data Models ---
+# --- Data Models with PIN Protection ---
 class PinVerifyPayload(BaseModel):
     pin: str
 
 class DriverPOCPayload(BaseModel):
-    pin: str | None = "045048"
+    pin: str
     driver_name: str | None = ""
     contact_info: str | None = ""
 
 class AlertPayload(BaseModel):
-    pin: str | None = "045048"
+    pin: str
     current_stop: str | None = "Van Route"
     next_stop: str | None = "Van Route"
     eta_mins: int | None = 0
@@ -98,26 +97,24 @@ class WalkerPayload(BaseModel):
     name: str
     contact: str | None = ""
 
-class NtfyDirectPayload(BaseModel):
-    title: str
-    message: str
-    tags: str | None = "minibus"
-
 class CompleteRequestPayload(BaseModel):
-    pin: str | None = "045048"
+    pin: str
     request_id: int
 
 class RemoveWalkerPayload(BaseModel):
-    pin: str | None = "045048"
+    pin: str
     walker_id: int
 
 class UpdateStatus(BaseModel):
-    pin: str | None = "045048"
+    pin: str
     request_id: int | None = 0
     new_status: str | None = ""
 
 class DriverRequestQuery(BaseModel):
-    pin: str | None = "045048"
+    pin: str
+
+class TestTelegramPayload(BaseModel):
+    pin: str
 
 @app.websocket("/ws/alerts")
 async def websocket_alerts_endpoint(websocket: WebSocket):
@@ -138,14 +135,12 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 def health():
     return {"status": "healthy"}
 
-@app.post("/api/ntfy-push")
-async def proxy_ntfy_push(payload: NtfyDirectPayload):
-    res = await send_to_ntfy(payload.title, payload.message, payload.tags or "minibus")
-    return res
-
-@app.get("/api/test-ntfy")
-async def test_ntfy():
-    res = await send_to_ntfy("ARC Van Diagnostic Test", "Test alert triggered from server.", "bell,white_check_mark")
+@app.post("/api/test-telegram")
+async def test_telegram(payload: TestTelegramPayload):
+    if payload.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
+    msg = "🔔 <b>ARC Shuttle Diagnostic Test</b>\n\nTelegram notifications are fully connected and active!"
+    res = await send_telegram_alert(msg)
     return res
 
 @app.post("/api/driver/verify-pin")
@@ -162,6 +157,9 @@ def get_poc():
 @app.post("/api/driver/poc")
 async def set_poc(payload: DriverPOCPayload):
     global ACTIVE_POC
+    if payload.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
+
     d_name = (payload.driver_name or "").strip()
     c_info = (payload.contact_info or "").strip()
     
@@ -169,13 +167,9 @@ async def set_poc(payload: DriverPOCPayload):
     ACTIVE_POC = {"driver_name": d_name, "contact_info": c_info, "updated_at": "Just now"}
     
     if d_name:
-        await send_to_ntfy(
-            f"Duty Driver: {d_name}",
-            f"Active on-duty driver is {d_name}. Contact: {c_info or 'N/A'}",
-            "identification_card,phone"
-        )
+        await send_telegram_alert(f"🪪 <b>Duty Driver Updated</b>\n\n<b>Driver:</b> {d_name}\n<b>Contact:</b> {c_info or 'N/A'}")
     else:
-        await send_to_ntfy("Duty Driver Cleared", "Driver contact has been reset.", "heavy_minus_sign")
+        await send_telegram_alert("ℹ️ <b>Duty Driver Contact Cleared</b>")
 
     await manager.broadcast({
         "type": "POC_UPDATED",
@@ -198,6 +192,9 @@ def get_status():
 
 @app.post("/api/driver/broadcast")
 async def broadcast_alert(alert: AlertPayload):
+    if alert.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
+
     loc = alert.location or alert.current_stop
     subject = alert.title or f"Van Location: {loc}"
     body = alert.detail or f"045/048 Van is currently at {loc}."
@@ -207,7 +204,7 @@ async def broadcast_alert(alert: AlertPayload):
     latest = database.get_latest_alert()
     queue_data = database.get_queue_data()
 
-    await send_to_ntfy(subject, body, "round_pushpin,bus")
+    await send_telegram_alert(f"🚐 <b>{subject}</b>\n\n{body}")
 
     await manager.broadcast({
         "type": "NEW_ALERT",
@@ -223,6 +220,8 @@ async def broadcast_alert(alert: AlertPayload):
 @app.post("/api/driver/requests")
 def driver_requests(payload: DriverRequestQuery):
     global ACTIVE_POC
+    if payload.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
     return {
         "requests": database.get_queue_data()["manifest"],
         "walkers": database.get_walking_list(),
@@ -231,9 +230,9 @@ def driver_requests(payload: DriverRequestQuery):
 
 @app.post("/api/driver/complete-request")
 async def complete_request(payload: CompleteRequestPayload):
+    if payload.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
     database.complete_single_request(payload.request_id)
-    await send_to_ntfy("Passenger Picked Up", f"Ride request #{payload.request_id} completed.", "white_check_mark")
-    
     queue_data = database.get_queue_data()
     await manager.broadcast({
         "type": "REQUESTS_UPDATED",
@@ -243,9 +242,9 @@ async def complete_request(payload: CompleteRequestPayload):
 
 @app.post("/api/driver/remove-walker")
 async def remove_walker(payload: RemoveWalkerPayload):
+    if payload.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
     database.remove_single_walker(payload.walker_id)
-    await send_to_ntfy("Walker Boarded", "Student has boarded the van.", "white_check_mark")
-    
     walkers = database.get_walking_list()
     await manager.broadcast({
         "type": "WALKERS_UPDATED",
@@ -267,12 +266,8 @@ async def request_ride(req: RideRequest):
         status=assigned_status
     )
 
-    contact_text = f" ({req.contact.strip()})" if req.contact else ""
-    await send_to_ntfy(
-        f"Ride Request: {req.name.strip()}",
-        f"Pickup: {req.pickup.strip()} -> Dropoff: {req.dropoff.strip()}{contact_text}",
-        "taxi,bell"
-    )
+    contact_text = f"\n<b>Contact:</b> {req.contact.strip()}" if req.contact else ""
+    await send_telegram_alert(f"🚖 <b>New Ride Request</b>\n\n<b>Rider:</b> {req.name.strip()}\n<b>Pickup:</b> {req.pickup.strip()} ➔ <b>Dropoff:</b> {req.dropoff.strip()}{contact_text}")
 
     queue_data = database.get_queue_data()
     await manager.broadcast({
@@ -297,12 +292,8 @@ async def heading_to_van(payload: WalkerPayload):
         contact=(payload.contact or '').strip()
     )
 
-    contact_text = f" ({payload.contact.strip()})" if payload.contact else ""
-    await send_to_ntfy(
-        f"Incoming Walker: {payload.name.strip()}",
-        f"{payload.name.strip()} is heading to the pickup spot now{contact_text}.",
-        "walking,information_source"
-    )
+    contact_text = f"\n<b>Contact:</b> {payload.contact.strip()}" if payload.contact else ""
+    await send_telegram_alert(f"🚶 <b>Incoming Passenger</b>\n\n{payload.name.strip()} is walking to the van pickup spot right now!{contact_text}")
 
     walkers = database.get_walking_list()
     await manager.broadcast({
@@ -316,8 +307,9 @@ async def heading_to_van(payload: WalkerPayload):
 
 @app.post("/api/driver/clear-walking")
 async def clear_walking(payload: UpdateStatus):
+    if payload.pin != DRIVER_PIN:
+        raise HTTPException(status_code=403, detail="Invalid Driver PIN")
     database.clear_walking_to_van()
-    await send_to_ntfy("Walkers Cleared", "Driver cleared the incoming arrivals list.", "broom")
     await manager.broadcast({"type": "WALKERS_UPDATED", "walkers": [], "count": 0})
     return {"success": True}
 
