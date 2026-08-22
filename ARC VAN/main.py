@@ -1,12 +1,10 @@
 import os
 import json
-import ssl
-import http.client
-import urllib.parse
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import httpx
 
 import database
 
@@ -22,36 +20,31 @@ NTFY_TOPIC = "arc-van-knox-045048"
 
 ACTIVE_POC = database.get_driver_poc()
 
-# Direct HTTPS client to bypass all urllib/FastAPI async hanging issues
-def send_to_ntfy(title: str, message: str, tags: str = "minibus") -> bool:
+async def send_to_ntfy(title: str, message: str, tags: str = "minibus") -> dict:
+    """
+    Robust async delivery to ntfy.sh using httpx.
+    Bypasses cloud proxy / SSL negotiation blocks.
+    """
+    clean_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
+    clean_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
+    url = f"https://ntfy.sh/{NTFY_TOPIC}"
+    
+    headers = {
+        "Title": clean_title,
+        "Priority": "urgent",
+        "Tags": clean_tags,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Content-Type": "text/plain; charset=utf-8"
+    }
+
     try:
-        clean_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
-        clean_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
-        
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        
-        conn = http.client.HTTPSConnection("ntfy.sh", 443, context=ctx, timeout=8)
-        
-        query_path = f"/{NTFY_TOPIC}?title={urllib.parse.quote(clean_title)}&tags={urllib.parse.quote(clean_tags)}&priority=urgent"
-        body_data = (message or "ARC Shuttle Alert").encode("utf-8")
-        
-        headers = {
-            "Content-Type": "text/plain; charset=utf-8",
-            "User-Agent": "ARC-Van-Tracker/1.0"
-        }
-        
-        conn.request("POST", query_path, body=body_data, headers=headers)
-        response = conn.getresponse()
-        resp_body = response.read().decode("utf-8", errors="ignore")
-        conn.close()
-        
-        print(f"🚀 [NTFY PUSH] HTTP {response.status} | Title: {clean_title} | Response: {resp_body[:60]}")
-        return response.status in (200, 201, 202)
+        async with httpx.AsyncClient(verify=False, timeout=8.0) as client:
+            resp = await client.post(url, content=(message or "Shuttle Update").encode("utf-8"), headers=headers)
+            print(f"🚀 [NTFY PUSH] HTTP {resp.status_code} | Title: {clean_title}")
+            return {"success": resp.status_code in (200, 201, 202), "status": resp.status_code, "detail": resp.text}
     except Exception as e:
-        print(f"❌ [NTFY ERROR]: {e}")
-        return False
+        print(f"❌ [NTFY EXCEPTION]: {e}")
+        return {"success": False, "status": 500, "detail": str(e)}
 
 class ConnectionManager:
     def __init__(self):
@@ -146,16 +139,15 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 def health():
     return {"status": "healthy"}
 
-# Dedicated server-side proxy so frontend never gets blocked by CORS or ad-blockers
 @app.post("/api/ntfy-push")
-def proxy_ntfy_push(payload: NtfyDirectPayload):
-    success = send_to_ntfy(payload.title, payload.message, payload.tags or "minibus")
-    return {"success": success}
+async def proxy_ntfy_push(payload: NtfyDirectPayload):
+    res = await send_to_ntfy(payload.title, payload.message, payload.tags or "minibus")
+    return res
 
 @app.get("/api/test-ntfy")
-def test_ntfy():
-    success = send_to_ntfy("ARC Van Test Ping", "If you see this, notifications are working!", "bell,white_check_mark")
-    return {"success": success}
+async def test_ntfy():
+    res = await send_to_ntfy("ARC Van Diagnostic Test", "Test alert triggered from server.", "bell,white_check_mark")
+    return res
 
 @app.post("/api/driver/verify-pin")
 def verify_driver_pin(payload: PinVerifyPayload):
@@ -178,13 +170,13 @@ async def set_poc(payload: DriverPOCPayload):
     ACTIVE_POC = {"driver_name": d_name, "contact_info": c_info, "updated_at": "Just now"}
     
     if d_name:
-        send_to_ntfy(
+        await send_to_ntfy(
             f"Duty Driver: {d_name}",
             f"Active on-duty driver is {d_name}. Contact: {c_info or 'N/A'}",
             "identification_card,phone"
         )
     else:
-        send_to_ntfy("Duty Driver Cleared", "Driver contact has been reset.", "heavy_minus_sign")
+        await send_to_ntfy("Duty Driver Cleared", "Driver contact has been reset.", "heavy_minus_sign")
 
     await manager.broadcast({
         "type": "POC_UPDATED",
@@ -216,7 +208,7 @@ async def broadcast_alert(alert: AlertPayload):
     latest = database.get_latest_alert()
     queue_data = database.get_queue_data()
 
-    send_to_ntfy(subject, body, "round_pushpin,bus")
+    await send_to_ntfy(subject, body, "round_pushpin,bus")
 
     await manager.broadcast({
         "type": "NEW_ALERT",
@@ -241,7 +233,7 @@ def driver_requests(payload: DriverRequestQuery):
 @app.post("/api/driver/complete-request")
 async def complete_request(payload: CompleteRequestPayload):
     database.complete_single_request(payload.request_id)
-    send_to_ntfy("Passenger Picked Up", f"Ride request #{payload.request_id} picked up.", "white_check_mark")
+    await send_to_ntfy("Passenger Picked Up", f"Ride request #{payload.request_id} completed.", "white_check_mark")
     
     queue_data = database.get_queue_data()
     await manager.broadcast({
@@ -253,7 +245,7 @@ async def complete_request(payload: CompleteRequestPayload):
 @app.post("/api/driver/remove-walker")
 async def remove_walker(payload: RemoveWalkerPayload):
     database.remove_single_walker(payload.walker_id)
-    send_to_ntfy("Walker Boarded", "Student has boarded the van.", "white_check_mark")
+    await send_to_ntfy("Walker Boarded", "Student has boarded the van.", "white_check_mark")
     
     walkers = database.get_walking_list()
     await manager.broadcast({
@@ -277,7 +269,7 @@ async def request_ride(req: RideRequest):
     )
 
     contact_text = f" ({req.contact.strip()})" if req.contact else ""
-    send_to_ntfy(
+    await send_to_ntfy(
         f"Ride Request: {req.name.strip()}",
         f"Pickup: {req.pickup.strip()} -> Dropoff: {req.dropoff.strip()}{contact_text}",
         "taxi,bell"
@@ -307,9 +299,9 @@ async def heading_to_van(payload: WalkerPayload):
     )
 
     contact_text = f" ({payload.contact.strip()})" if payload.contact else ""
-    send_to_ntfy(
+    await send_to_ntfy(
         f"Incoming Walker: {payload.name.strip()}",
-        f"{payload.name.strip()} is walking to the van now{contact_text}.",
+        f"{payload.name.strip()} is heading to the pickup spot now{contact_text}.",
         "walking,information_source"
     )
 
@@ -326,7 +318,7 @@ async def heading_to_van(payload: WalkerPayload):
 @app.post("/api/driver/clear-walking")
 async def clear_walking(payload: UpdateStatus):
     database.clear_walking_to_van()
-    send_to_ntfy("Walkers Cleared", "Driver cleared the incoming arrivals list.", "broom")
+    await send_to_ntfy("Walkers Cleared", "Driver cleared the incoming arrivals list.", "broom")
     await manager.broadcast({"type": "WALKERS_UPDATED", "walkers": [], "count": 0})
     return {"success": True}
 
