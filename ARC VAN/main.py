@@ -1,8 +1,9 @@
 import os
 import json
 import ssl
+import asyncio
 import urllib.request
-import urllib.error
+import urllib.parse
 from typing import List
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -17,7 +18,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
-# Dedicated Separate Ntfy Topics
+# Distinct Ntfy Topics
 NTFY_RIDER_TOPIC = "arc-knox-riders-8921"
 NTFY_DRIVER_TOPIC = "arc-knox-drivers-8921"
 
@@ -27,34 +28,39 @@ ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode = ssl.CERT_NONE
 
-def publish_ntfy(topic: str, title: str, message: str, tags: str = "minibus") -> dict:
-    """Direct HTTP POST to specific ntfy.sh topic with clean ASCII headers"""
-    url = f"https://ntfy.sh/{topic}"
-    safe_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Shuttle Alert"
-    safe_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
-    body = (message or "ARC Shuttle update").encode("utf-8")
-
+def sync_send_ntfy(topic: str, title: str, message: str, tags: str = "minibus"):
+    """
+    Direct HTTP POST to ntfy.sh with URL parameters.
+    This guarantees 100% deliverability without header drops or proxy blocking.
+    """
+    params = urllib.parse.urlencode({
+        "title": title or "ARC Van Alert",
+        "tags": tags or "minibus",
+        "priority": "urgent"
+    })
+    url = f"https://ntfy.sh/{topic}?{params}"
+    body = (message or "Update").encode("utf-8")
+    
     req = urllib.request.Request(
         url,
         data=body,
         headers={
-            "Title": safe_title,
-            "Priority": "high",
-            "Tags": safe_tags,
-            "User-Agent": "ARC-Van-Tracker/1.0"
+            "Content-Type": "text/plain; charset=utf-8",
+            "User-Agent": "ARC-Van/1.0"
         },
         method="POST"
     )
     try:
         with urllib.request.urlopen(req, timeout=6, context=ssl_ctx) as resp:
-            print(f"✅ [NTFY SUCCESS -> {topic}] Status {resp.status} - '{safe_title}'")
+            print(f"✅ [NTFY OK -> {topic}] Status: {resp.status} | Title: {title}")
             return {"success": True, "status": resp.status}
-    except urllib.error.HTTPError as e:
-        print(f"❌ [NTFY HTTP ERROR -> {topic}] {e.code} - {e.reason}")
-        return {"success": False, "status": e.code, "error": str(e.reason)}
     except Exception as e:
-        print(f"❌ [NTFY GENERAL ERROR -> {topic}] {e}")
-        return {"success": False, "status": 500, "error": str(e)}
+        print(f"❌ [NTFY FAIL -> {topic}] {e}")
+        return {"success": False, "error": str(e)}
+
+async def publish_ntfy_async(topic: str, title: str, message: str, tags: str = "minibus"):
+    """Dispatches in background thread without blocking the FastAPI event loop"""
+    return await asyncio.to_thread(sync_send_ntfy, topic, title, message, tags)
 
 class ConnectionManager:
     def __init__(self):
@@ -145,10 +151,10 @@ def health():
     return {"status": "healthy"}
 
 @app.get("/api/test-ntfy")
-def test_ntfy():
-    r1 = publish_ntfy(NTFY_RIDER_TOPIC, "Rider Channel Test", "Test alert for students.", "white_check_mark")
-    r2 = publish_ntfy(NTFY_DRIVER_TOPIC, "Driver Channel Test", "Test alert for drivers.", "white_check_mark")
-    return {"rider_channel": r1, "driver_channel": r2}
+async def test_ntfy():
+    r1 = await publish_ntfy_async(NTFY_RIDER_TOPIC, "Rider Push Test", "Testing push to riders.", "bell")
+    r2 = await publish_ntfy_async(NTFY_DRIVER_TOPIC, "Driver Push Test", "Testing push to drivers.", "taxi")
+    return {"rider": r1, "driver": r2}
 
 @app.post("/api/driver/verify-pin")
 def verify_driver_pin(payload: PinVerifyPayload):
@@ -171,12 +177,11 @@ async def set_poc(payload: DriverPOCPayload):
     ACTIVE_POC = {"driver_name": d_name, "contact_info": c_info, "updated_at": "Just now"}
     
     if d_name:
-        # Send Duty Driver update to Riders
-        publish_ntfy(
+        await publish_ntfy_async(
             NTFY_RIDER_TOPIC,
             f"Duty Driver: {d_name}",
             f"Active on-duty driver is {d_name}. Contact: {c_info or 'N/A'}",
-            "identification_card,phone"
+            "identification_card"
         )
 
     await manager.broadcast({
@@ -209,8 +214,8 @@ async def broadcast_alert(alert: AlertPayload):
     latest = database.get_latest_alert()
     queue_data = database.get_queue_data()
 
-    # Van location and departures go to Rider channel
-    publish_ntfy(NTFY_RIDER_TOPIC, subject, body, "round_pushpin,bus")
+    # Send location and departures to Riders
+    await publish_ntfy_async(NTFY_RIDER_TOPIC, subject, body, "bus")
 
     await manager.broadcast({
         "type": "NEW_ALERT",
@@ -267,12 +272,12 @@ async def request_ride(req: RideRequest):
     )
 
     contact_text = f" ({req.contact.strip()})" if req.contact else ""
-    # Ride request goes to Driver Channel
-    publish_ntfy(
+    # Push ride request to Driver Topic
+    await publish_ntfy_async(
         NTFY_DRIVER_TOPIC,
         f"Ride Request: {req.name.strip()}",
         f"Pickup: {req.pickup.strip()} -> Dropoff: {req.dropoff.strip()}{contact_text}",
-        "taxi,bell"
+        "taxi"
     )
 
     queue_data = database.get_queue_data()
@@ -299,12 +304,12 @@ async def heading_to_van(payload: WalkerPayload):
     )
 
     contact_text = f" ({payload.contact.strip()})" if payload.contact else ""
-    # Walker alert goes to Driver Channel
-    publish_ntfy(
+    # Push incoming walker alert to Driver Topic
+    await publish_ntfy_async(
         NTFY_DRIVER_TOPIC,
         f"Incoming Walker: {payload.name.strip()}",
         f"{payload.name.strip()} is heading to the pickup spot now{contact_text}.",
-        "walking,information_source"
+        "walking"
     )
 
     walkers = database.get_walking_list()
