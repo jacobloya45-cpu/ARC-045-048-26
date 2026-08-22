@@ -73,7 +73,7 @@
           <article class="stat-card"><div class="stat-head"><span>HEADING TO VAN</span><span class="stat-icon">→</span></div><strong id="walking-count">0 <small>students</small></strong><div class="stat-foot"><span>Incoming arrivals</span></div></article>
         </div>
 
-        <!-- DRIVER POC CONFIGURATION PANEL -->
+        <!-- DRIVER POC PANEL -->
         <section class="panel" style="border-left: 4px solid var(--mint-deep); margin-bottom: 20px;">
           <div class="panel-header">
             <div>
@@ -193,17 +193,19 @@
             </div>
           </section>
 
+          <!-- HEADING TO VAN FORM (NO EMAIL REQUIRED) -->
           <section class="panel heading-panel">
             <div class="panel-header"><div><span class="section-kicker">NOTIFY DRIVER</span><h3>I'm heading to the Van</h3></div></div>
             <p class="muted">Let the driver know you're walking to the pickup spot now.</p>
             <form id="heading-to-van-form" class="heading-form">
               <label><span>Your name</span><input name="name" type="text" placeholder="e.g. PVT Smith" required></label>
-              <label><span>Email or Unit</span><input name="email" type="text" placeholder="e.g. B Co / smith@mail.mil" required></label>
+              <label><span>Phone / Signal code (Optional)</span><input name="contact" type="text" placeholder="e.g. (502) 555-0199 or Signal ID"></label>
               <button class="primary-btn" type="submit">I'm heading to the Van</button>
             </form>
           </section>
         </div>
 
+        <!-- QUICK RIDE REQUEST CONSOLE (NO EMAIL REQUIRED) -->
         <section class="panel ride-request-panel" style="margin-top: 24px;">
           <div class="panel-header">
             <div>
@@ -213,9 +215,15 @@
           </div>
           
           <div class="student-request-console">
-            <div class="student-name-box">
-              <label for="student-rider-name"><strong>Your Name:</strong></label>
-              <input id="student-rider-name" type="text" placeholder="Enter your name (e.g., PVT Smith)" maxlength="50" style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; width: 100%; max-width: 320px; font-size: 14px; margin-top: 6px;">
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <div class="student-name-box" style="flex: 1; min-width: 200px;">
+                <label for="student-rider-name" style="font-size: 11px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px;">YOUR NAME *</label>
+                <input id="student-rider-name" type="text" placeholder="e.g. PVT Smith" maxlength="50" style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 14px;">
+              </div>
+              <div style="flex: 1; min-width: 200px;">
+                <label for="student-rider-contact" style="font-size: 11px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px;">PHONE / SIGNAL CODE (OPTIONAL)</label>
+                <input id="student-rider-contact" type="text" placeholder="e.g. (502) 555-0199 or Signal ID" maxlength="80" style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 14px;">
+              </div>
             </div>
 
             <div style="margin-top: 18px;">
