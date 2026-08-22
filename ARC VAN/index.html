@@ -176,9 +176,9 @@
           <section class="panel alert-panel">
             <div class="panel-header">
               <div><span class="section-kicker">DRIVER UPDATES</span><h3>Latest van alert</h3></div>
-              <div class="alert-meta"><span class="monitor-status"><i></i> LIVE WEBSOCKET</span><span id="student-alert-time" class="alert-time">Just now</span></div>
+              <div class="alert-meta"><span class="monitor-status"><i></i> LIVE FEED</span></div>
             </div>
-            <div class="alert-callout">
+            <div class="alert-callout" style="margin-bottom: 12px;">
               <span>⌁</span>
               <div class="student-alert-columns">
                 <div class="location-alert-column">
@@ -190,6 +190,12 @@
                   <strong id="student-departure-time">En Route</strong>
                 </div>
               </div>
+            </div>
+            
+            <!-- DIRECT TIMESTAMP DISPLAY UNDERNEATH DRIVER UPDATE -->
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #edf3ea; padding: 8px 12px; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 11px;">
+              <span style="color: var(--muted); font-weight: 500;">LAST DRIVER UPDATE:</span>
+              <span id="student-alert-time" style="color: var(--mint-deep); font-weight: 700;">Waiting for driver...</span>
             </div>
           </section>
 
