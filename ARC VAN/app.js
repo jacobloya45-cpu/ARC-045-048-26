@@ -149,14 +149,16 @@ function initWebSocket() {
         renderDriverWalkers(data.walkers || []);
         if (data.new_name) {
           playAlertTone();
-          showToast(`🚶 Incoming: ${data.new_name} is walking to the van!`);
+          const contactStr = data.new_contact ? ` (${data.new_contact})` : '';
+          showToast(`🚶 Incoming: ${data.new_name}${contactStr} is walking to the van!`);
         }
       } else if (data.type === 'POC_UPDATED') {
         renderDriverPOC(data.poc);
         showToast('Driver POC updated live');
       } else if (data.type === 'NEW_RIDE_REQUEST') {
         playAlertTone();
-        showToast(`🚖 New Ride: ${data.name} (${data.pickup} → ${data.dropoff})`);
+        const contactStr = data.contact ? ` [${data.contact}]` : '';
+        showToast(`🚖 New Ride: ${data.name}${contactStr} (${data.pickup} → ${data.dropoff})`);
       }
     } catch (err) {
       console.error('Socket parse error', err);
@@ -197,7 +199,6 @@ function renderDriverPOC(poc) {
   const name = (poc.driver_name || '').trim();
   const contact = (poc.contact_info || '').trim();
 
-  // Populate driver inputs if not focused
   if (driverPocNameInput && document.activeElement !== driverPocNameInput) {
     driverPocNameInput.value = name;
   }
@@ -205,7 +206,6 @@ function renderDriverPOC(poc) {
     driverPocContactInput.value = contact;
   }
 
-  // Update sidebar branding
   if (sidebarDriverName) {
     sidebarDriverName.textContent = name || 'On-Duty Driver';
   }
@@ -213,7 +213,6 @@ function renderDriverPOC(poc) {
     sidebarDriverAvatar.textContent = name ? name.slice(0, 2).toUpperCase() : 'DV';
   }
 
-  // Update student view POC display
   if (studentDisplayDriverName) {
     studentDisplayDriverName.textContent = name ? `Duty Driver: ${name}` : '045/048 Duty Driver';
   }
@@ -336,7 +335,6 @@ window.addEventListener('load', () => {
   }
 });
 
-// Driver POC Form submit handler
 if (driverPocForm) {
   driverPocForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -553,9 +551,13 @@ document.querySelectorAll('.departure-option').forEach((button) => button.addEve
   if (departureTime) departureTime.textContent = `${button.dataset.wait} min`;
 }));
 
+// Submit Ride Request (No Email required, optional phone/signal contact)
 function submitStudentRideRequest(pickup, dropoff) {
   const nameInput = document.querySelector('#student-rider-name');
+  const contactInput = document.querySelector('#student-rider-contact');
+  
   const name = nameInput ? nameInput.value.trim() : '';
+  const contact = contactInput ? contactInput.value.trim() : '';
   
   if (!name) {
     showToast('⚠️ Please enter your name first!');
@@ -566,7 +568,7 @@ function submitStudentRideRequest(pickup, dropoff) {
   fetch('/api/request-ride', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name, pickup: pickup, dropoff: dropoff })
+    body: JSON.stringify({ name: name, contact: contact, pickup: pickup, dropoff: dropoff })
   })
   .then((res) => res.json())
   .then(() => {
@@ -655,16 +657,18 @@ if (sendCustomRideBtn) {
   });
 }
 
+// Heading to Van Notification (No Email required, optional phone/signal contact)
 if (headingToVanForm) {
   headingToVanForm.addEventListener('submit', (event) => {
     event.preventDefault();
     const name = headingToVanForm.elements.name.value.trim();
-    const email = headingToVanForm.elements.email.value.trim().toLowerCase();
-    if (!name || !email) return;
+    const contact = headingToVanForm.elements.contact ? headingToVanForm.elements.contact.value.trim() : '';
+    if (!name) return;
+    
     fetch('/api/student/heading-to-van', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email })
+      body: JSON.stringify({ name: name, contact: contact })
     }).then(() => {
       headingToVanForm.reset();
       showToast("Driver notified you're heading to the van!");
@@ -701,6 +705,7 @@ function switchView(view) {
   }
 }
 
+// Render Incoming Walkers Manifest on Driver Console
 function renderDriverWalkers(walkers) {
   if (!driverWalkerList) return;
   if (!walkers || !walkers.length) {
@@ -713,7 +718,7 @@ function renderDriverWalkers(walkers) {
       <div class="request-avatar" style="background:#fbe3db; color:var(--coral);">${(walker.name || '?').slice(0, 2).toUpperCase()}</div>
       <div class="driver-request-info">
         <strong>${walker.name}</strong>
-        <span>Status: <b>Walking to van right now</b></span>
+        <span>Status: <b>Walking to van</b> ${walker.contact ? `· Contact: <b style="color:var(--coral);">${walker.contact}</b>` : ''}</span>
       </div>
       <button class="primary-btn arrive-walker-btn" data-walkerid="${walker.id}" style="padding: 6px 10px; font-size: 11px; margin-left: auto; background: var(--mint-deep);">Boarded / Arrived</button>
     </div>
@@ -731,6 +736,7 @@ function renderDriverWalkers(walkers) {
   });
 }
 
+// Render Student Pickup Requests on Driver Console
 function renderDriverRequests(requests) {
   if (!driverRequestList) return;
   if (waitingCount) waitingCount.innerHTML = `${requests.length} <small>students</small>`;
@@ -745,7 +751,7 @@ function renderDriverRequests(requests) {
       <div class="request-avatar">${(request[1] || '?').slice(0, 2).toUpperCase()}</div>
       <div class="driver-request-info">
         <strong>${request[1]}</strong>
-        <span>Pickup: <b>${request[2]}</b> &rarr; Destination: <b>${request[3]}</b></span>
+        <span>Pickup: <b>${request[3]}</b> &rarr; Dest: <b>${request[4]}</b> ${request[2] ? `· Contact: <b style="color:var(--coral);">${request[2]}</b>` : ''}</span>
       </div>
       <button class="primary-btn complete-request-btn" data-reqid="${request[0]}" style="padding: 6px 10px; font-size: 11px; margin-left: auto;">Picked Up</button>
     </div>
