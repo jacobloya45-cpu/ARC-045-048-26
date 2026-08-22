@@ -15,10 +15,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
-# Global In-Memory Fallback Cache to ensure 100% instant sync across devices
 ACTIVE_POC = database.get_driver_poc()
 
-# --- Native WebSocket Connection Manager ---
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -44,7 +42,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# --- Pydantic Data Models ---
+# --- Pydantic Data Models (No Email Required) ---
 class PinVerifyPayload(BaseModel):
     pin: str
 
@@ -64,13 +62,13 @@ class AlertPayload(BaseModel):
 
 class RideRequest(BaseModel):
     name: str
-    email: str | None = None
+    contact: str | None = ""
     pickup: str
     dropoff: str
 
-class AlertSignup(BaseModel):
+class WalkerPayload(BaseModel):
     name: str
-    email: str
+    contact: str | None = ""
 
 class CompleteRequestPayload(BaseModel):
     pin: str
@@ -214,11 +212,10 @@ async def remove_walker(payload: RemoveWalkerPayload):
 async def request_ride(req: RideRequest):
     conn = sqlite3.connect(database.DB_NAME)
     cursor = conn.cursor()
-    request_email = req.email or f"ride-{os.urandom(4).hex()}@arc-van.local"
     
-    cursor.execute("INSERT OR REPLACE INTO users (name, email) VALUES (?, ?)", (req.name, request_email.lower()))
-    cursor.execute("SELECT id FROM users WHERE email = ?", (request_email.lower(),))
-    user_id = cursor.fetchone()[0]
+    # Store user with name and optional contact
+    cursor.execute("INSERT INTO users (name, contact) VALUES (?, ?)", (req.name, req.contact or ""))
+    user_id = cursor.lastrowid
 
     cursor.execute("SELECT COUNT(*) FROM requests WHERE status IN ('CONFIRMED', 'BOARDED')")
     active_count = cursor.fetchone()[0]
@@ -235,6 +232,7 @@ async def request_ride(req: RideRequest):
     await manager.broadcast({
         "type": "NEW_RIDE_REQUEST",
         "name": req.name,
+        "contact": req.contact or "",
         "pickup": req.pickup,
         "dropoff": req.dropoff,
         "status": assigned_status
@@ -247,13 +245,11 @@ async def request_ride(req: RideRequest):
     return {"status": assigned_status}
 
 @app.post("/api/student/heading-to-van")
-async def heading_to_van(signup: AlertSignup):
+async def heading_to_van(payload: WalkerPayload):
     conn = sqlite3.connect(database.DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO users (name, email) VALUES (?, ?)", (signup.name, signup.email.lower()))
-    conn.commit()
-    cursor.execute("SELECT id FROM users WHERE email = ?", (signup.email.lower(),))
-    user_id = cursor.fetchone()[0]
+    cursor.execute("INSERT INTO users (name, contact) VALUES (?, ?)", (payload.name, payload.contact or ""))
+    user_id = cursor.lastrowid
     cursor.execute("INSERT INTO walking_to_van (user_id) VALUES (?)", (user_id,))
     conn.commit()
     conn.close()
@@ -263,7 +259,8 @@ async def heading_to_van(signup: AlertSignup):
         "type": "WALKERS_UPDATED",
         "walkers": walkers,
         "count": len(walkers),
-        "new_name": signup.name
+        "new_name": payload.name,
+        "new_contact": payload.contact or ""
     })
     return {"success": True}
 
