@@ -32,16 +32,16 @@
         <div><p class="eyebrow">Service Active</p><h1 id="page-title">Your ride, on your time <span>✦</span></h1></div>
       </header>
 
-      <!-- GLOBAL NTFY PUSH NOTIFICATION BANNER -->
+      <!-- GLOBAL TELEGRAM PUSH NOTIFICATION BANNER -->
       <div class="panel" style="background:#173333; color:#dcebe1; border:1px solid #2a5252; padding:14px 18px; margin-bottom:24px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
         <div style="display:flex; align-items:center; gap:10px;">
-          <span style="font-size:22px;">🔔</span>
+          <span style="font-size:22px;">✈️</span>
           <div>
-            <strong style="color:#fff; font-size:13px; display:block;">Get Phone Push Notifications</strong>
-            <span style="color:#a8bfba; font-size:11px;">Subscribe on Ntfy to get buzz alerts when the van moves, departs, or receives ride requests.</span>
+            <strong style="color:#fff; font-size:13px; display:block;">Get Push Notifications on Telegram</strong>
+            <span style="color:#a8bfba; font-size:11px;">Join the Telegram channel for real-time departure, arrival, and location buzzes.</span>
           </div>
         </div>
-        <a href="https://ntfy.sh/arc-045-048-shuttle-knox-v9x7" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; padding:8px 14px; font-size:11px; white-space:nowrap; background:#b7f0c6; color:#173333; box-shadow:none;">👉 Open & Subscribe to Ntfy Topic</a>
+        <a id="telegram-banner-btn" href="https://t.me/YOUR_TELEGRAM_CHANNEL" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; padding:8px 14px; font-size:11px; white-space:nowrap; background:#b7f0c6; color:#173333; box-shadow:none;">👉 Join Telegram Alerts</a>
       </div>
 
       <!-- DRIVER VIEW -->
@@ -85,16 +85,16 @@
           <article class="stat-card"><div class="stat-head"><span>HEADING TO VAN</span><span class="stat-icon">→</span></div><strong id="walking-count">0 <small>students</small></strong><div class="stat-foot"><span>Incoming arrivals</span></div></article>
         </div>
 
-        <!-- DRIVER POC & TEST PANEL -->
+        <!-- DRIVER POC & TELEGRAM TEST PANEL -->
         <section class="panel" style="border-left: 4px solid var(--mint-deep); margin-bottom: 20px;">
           <div class="panel-header" style="margin-bottom:12px;">
             <div>
               <span class="section-kicker">DRIVER POC (OPTIONAL)</span>
               <h3>On-Duty Driver Contact</h3>
             </div>
-            <button class="secondary-btn" id="test-ntfy-btn" type="button" style="padding:6px 12px; font-size:11px;">🔔 Test Ntfy Push</button>
+            <button class="secondary-btn" id="test-telegram-btn" type="button" style="padding:6px 12px; font-size:11px;">🔔 Test Telegram Alert</button>
           </div>
-          <p class="muted" style="margin-bottom: 14px;">Set your name and phone/Signal ID for students. Saving sends an alert to Ntfy and updates student screens.</p>
+          <p class="muted" style="margin-bottom: 14px;">Set your name and phone/Signal ID for students. Saving broadcasts an alert to Telegram and updates rider displays.</p>
           <form id="driver-poc-form" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
             <div style="flex: 1; min-width: 180px;">
               <label for="driver-poc-name" style="font-size: 11px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px;">DRIVER NAME / RANK</label>
@@ -276,14 +276,14 @@
           </div>
         </section>
 
-        <!-- STUDENT NTFY SUBSCRIPTION CARD -->
+        <!-- STUDENT TELEGRAM CARD -->
         <section class="panel qr-panel" style="margin-top: 24px; background: linear-gradient(180deg, #fff 0%, #edf3ea 100%);">
           <div class="qr-copy">
-            <span class="section-kicker">PHONE PUSH NOTIFICATIONS</span>
-            <h3>Subscribe to Instant Alerts</h3>
-            <p>Get buzz notifications on your phone whenever the van leaves, changes stops, or has available seats.</p>
+            <span class="section-kicker">TELEGRAM ALERTS</span>
+            <h3>Subscribe to Push Notifications</h3>
+            <p>Join the Telegram channel to get buzz alerts on your phone whenever the van departs or arrives.</p>
             <div style="margin-top: 10px;">
-              <a href="https://ntfy.sh/arc-045-048-shuttle-knox-v9x7" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; display:inline-block; padding:9px 16px; font-size:12px; margin-bottom: 8px;">🔔 Subscribe to Ntfy Topic</a>
+              <a id="telegram-card-btn" href="https://t.me/YOUR_TELEGRAM_CHANNEL" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; display:inline-block; padding:9px 16px; font-size:12px; margin-bottom: 8px;">✈️ Open Telegram Channel</a>
               <br>
               <span class="qr-url student-qr-url">Loading link...</span>
             </div>
