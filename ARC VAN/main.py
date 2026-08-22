@@ -16,7 +16,7 @@ database.init_db()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
-NTFY_TOPIC = "arc-van-fort-knox-045048"
+NTFY_TOPIC = "arc-knox-shuttle-8921"
 
 ACTIVE_POC = database.get_driver_poc()
 
@@ -24,34 +24,34 @@ ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode = ssl.CERT_NONE
 
-def publish_ntfy(title: str, message: str, tags: str = "minibus"):
-    """
-    Direct HTTP POST to ntfy.sh/<topic> using plain ASCII headers and UTF-8 body.
-    Bypasses Cloudflare bot detection with explicit browser headers.
-    """
+def publish_ntfy(title: str, message: str, tags: str = "minibus") -> dict:
+    """Direct HTTP POST to ntfy.sh/<topic> with ASCII header safety"""
+    url = f"https://ntfy.sh/{NTFY_TOPIC}"
+    safe_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
+    safe_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
+    body = (message or "ARC Shuttle update").encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Title": safe_title,
+            "Priority": "high",
+            "Tags": safe_tags,
+            "User-Agent": "ARC-Van-Tracker/1.0"
+        },
+        method="POST"
+    )
     try:
-        url = f"https://ntfy.sh/{NTFY_TOPIC}"
-        # Strip or convert emojis for HTTP header safety
-        ascii_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
-        
-        req = urllib.request.Request(
-            url,
-            data=message.encode("utf-8"),
-            headers={
-                "Title": ascii_title,
-                "Priority": "urgent",
-                "Tags": tags,
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept": "*/*"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
-            print(f"✅ [NTFY SUCCESS] Status {resp.status} - '{ascii_title}'")
-            return True
+        with urllib.request.urlopen(req, timeout=6, context=ssl_ctx) as resp:
+            print(f"✅ [NTFY SUCCESS] Status {resp.status} - '{safe_title}'")
+            return {"success": True, "status": resp.status}
+    except urllib.error.HTTPError as e:
+        print(f"❌ [NTFY HTTP ERROR] {e.code} - {e.reason}")
+        return {"success": False, "status": e.code, "error": str(e.reason)}
     except Exception as e:
-        print(f"❌ [NTFY FAILED] {e}")
-        return False
+        print(f"❌ [NTFY GENERAL ERROR] {e}")
+        return {"success": False, "status": 500, "error": str(e)}
 
 class ConnectionManager:
     def __init__(self):
@@ -140,6 +140,11 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 def health():
     return {"status": "healthy"}
 
+@app.get("/api/test-ntfy")
+def test_ntfy():
+    res = publish_ntfy("ARC Van Diagnostic Test", "Test alert triggered from server.", "bell,white_check_mark")
+    return res
+
 @app.post("/api/driver/verify-pin")
 def verify_driver_pin(payload: PinVerifyPayload):
     if payload.pin == DRIVER_PIN:
@@ -163,7 +168,7 @@ async def set_poc(payload: DriverPOCPayload):
     if d_name:
         publish_ntfy(
             f"Duty Driver: {d_name}",
-            f"Active on-duty driver is {d_name}. Direct contact: {c_info or 'N/A'}",
+            f"Active on-duty driver is {d_name}. Contact: {c_info or 'N/A'}",
             "identification_card,phone"
         )
 
