@@ -15,15 +15,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
 
-# Unified topic
-NTFY_TOPIC = "arc-van-knox-045048"
+# Unique, unthrottled private topic
+NTFY_TOPIC = "arc-045-048-shuttle-knox-v9x7"
 
 ACTIVE_POC = database.get_driver_poc()
 
 async def send_to_ntfy(title: str, message: str, tags: str = "minibus") -> dict:
     """
     Robust async delivery to ntfy.sh using httpx.
-    Bypasses cloud proxy / SSL negotiation blocks.
     """
     clean_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
     clean_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
