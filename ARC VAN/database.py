@@ -6,20 +6,23 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Ensure users table
+    # Users table supporting optional contact
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
-            email TEXT UNIQUE NOT NULL,
+            email TEXT,
+            contact TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     user_cols = {row[1] for row in cursor.execute("PRAGMA table_info(users)").fetchall()}
     if "name" not in user_cols:
         cursor.execute("ALTER TABLE users ADD COLUMN name TEXT")
+    if "contact" not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN contact TEXT")
 
-    # Ensure requests table
+    # Requests table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +35,7 @@ def init_db():
         )
     """)
 
-    # Ensure alerts table
+    # Alerts table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +49,7 @@ def init_db():
     if "location" not in alert_columns:
         cursor.execute("ALTER TABLE alerts ADD COLUMN location TEXT")
 
-    # Ensure walking_to_van table
+    # Walking to van table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS walking_to_van (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +59,7 @@ def init_db():
         )
     """)
 
-    # Ensure driver_poc table
+    # Driver POC table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS driver_poc (
             id INTEGER PRIMARY KEY,
@@ -65,7 +68,9 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    cursor.execute("INSERT OR IGNORE INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
+    cursor.execute("SELECT COUNT(*) FROM driver_poc WHERE id = 1")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO driver_poc (id, driver_name, contact_info) VALUES (1, '', '')")
 
     conn.commit()
     conn.close()
@@ -118,7 +123,7 @@ def get_queue_data():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT r.id, COALESCE(u.name, u.email), r.pickup, r.dropoff, r.status, r.timestamp
+        SELECT r.id, COALESCE(u.name, 'Student'), COALESCE(u.contact, ''), r.pickup, r.dropoff, r.status, r.timestamp
         FROM requests r
         JOIN users u ON r.user_id = u.id
         WHERE r.status IN ('CONFIRMED', 'WAITLIST', 'BOARDED')
@@ -127,8 +132,8 @@ def get_queue_data():
     rows = cursor.fetchall()
     conn.close()
     
-    confirmed = [r for r in rows if r[4] in ('CONFIRMED', 'BOARDED')]
-    waitlist = [r for r in rows if r[4] == 'WAITLIST']
+    confirmed = [r for r in rows if r[5] in ('CONFIRMED', 'BOARDED')]
+    waitlist = [r for r in rows if r[5] == 'WAITLIST']
     return {"manifest": rows, "active_count": len(confirmed), "waitlist_count": len(waitlist)}
 
 def clear_requests_at_location(location: str):
@@ -157,14 +162,14 @@ def get_walking_list():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT w.id, COALESCE(u.name, u.email), w.created_at
+        SELECT w.id, COALESCE(u.name, 'Student'), COALESCE(u.contact, ''), w.created_at
         FROM walking_to_van w
         JOIN users u ON w.user_id = u.id
         ORDER BY w.id ASC
     """)
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "name": r[1], "time": r[2]} for r in rows]
+    return [{"id": r[0], "name": r[1], "contact": r[2], "time": r[3]} for r in rows]
 
 def clear_walking_to_van():
     conn = sqlite3.connect(DB_NAME)
