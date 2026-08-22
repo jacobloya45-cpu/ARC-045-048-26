@@ -38,9 +38,6 @@ const driverAuthKey = 'arc-van-driver-auth';
 const driverPinKey = 'arc-van-driver-token';
 const studentProfileKey = 'arc-van-student-profile';
 
-const NTFY_RIDER_TOPIC = 'arc-knox-riders-8921';
-const NTFY_DRIVER_TOPIC = 'arc-knox-drivers-8921';
-
 let currentVanLocation = '';
 let studentSelectedPickup = '';
 let socket = null;
@@ -417,10 +414,10 @@ if (testNtfyBtn) {
     fetch('/api/test-ntfy')
       .then((res) => res.json())
       .then((data) => {
-        if (data.rider_channel.success && data.driver_channel.success) {
-          showToast('✅ Both Rider & Driver Ntfy channels verified!');
+        if (data.rider.success && data.driver.success) {
+          showToast('✅ Ntfy push channels verified! (200 OK)');
         } else {
-          showToast(`⚠️ Ntfy response: Rider ${data.rider_channel.status}, Driver ${data.driver_channel.status}`);
+          showToast(`⚠️ Ntfy status: Rider: ${data.rider.status || data.rider.error}`);
         }
       })
       .catch((err) => showToast(`❌ Connection error: ${err.message}`));
