@@ -35,13 +35,13 @@
       <!-- GLOBAL NTFY PUSH NOTIFICATION BANNER -->
       <div class="panel" style="background:#173333; color:#dcebe1; border:1px solid #2a5252; padding:14px 18px; margin-bottom:24px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
         <div style="display:flex; align-items:center; gap:10px;">
-          <span style="font-size:20px;">🔔</span>
+          <span style="font-size:22px;">🔔</span>
           <div>
-            <strong style="color:#fff; font-size:13px; display:block;">Get Phone Push Notifications</strong>
-            <span style="color:#a8bfba; font-size:11px;">Subscribe on ntfy.sh to get buzz alerts when the van moves or departs.</span>
+            <strong style="color:#fff; font-size:13px; display:block;">Get Push Notifications on Your Phone</strong>
+            <span style="color:#a8bfba; font-size:11px;">Subscribe to our official Ntfy topic for real-time departure and arrival buzzes.</span>
           </div>
         </div>
-        <a href="https://ntfy.sh/arc-van-fort-knox-045048" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; padding:8px 14px; font-size:11px; white-space:nowrap; background:#b7f0c6; color:#173333; box-shadow:none;">👉 Open Ntfy Alert Feed</a>
+        <a href="https://ntfy.sh/arc-knox-shuttle-8921" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; padding:8px 14px; font-size:11px; white-space:nowrap; background:#b7f0c6; color:#173333; box-shadow:none;">👉 Open & Subscribe to Alerts</a>
       </div>
 
       <!-- DRIVER VIEW -->
@@ -85,15 +85,16 @@
           <article class="stat-card"><div class="stat-head"><span>HEADING TO VAN</span><span class="stat-icon">→</span></div><strong id="walking-count">0 <small>students</small></strong><div class="stat-foot"><span>Incoming arrivals</span></div></article>
         </div>
 
-        <!-- DRIVER POC PANEL -->
+        <!-- DRIVER POC & DIAGNOSTICS PANEL -->
         <section class="panel" style="border-left: 4px solid var(--mint-deep); margin-bottom: 20px;">
-          <div class="panel-header">
+          <div class="panel-header" style="margin-bottom:12px;">
             <div>
               <span class="section-kicker">DRIVER POC (OPTIONAL)</span>
-              <h3>On-Duty Driver Contact Information</h3>
+              <h3>On-Duty Driver Contact & Push Test</h3>
             </div>
+            <button class="secondary-btn" id="test-ntfy-btn" type="button" style="padding:6px 12px; font-size:11px;">🔔 Test Ntfy Push</button>
           </div>
-          <p class="muted" style="margin-bottom: 14px;">Set or update your name and phone number/Signal handle. This displays for students so they can reach the active driver directly.</p>
+          <p class="muted" style="margin-bottom: 14px;">Set your name and phone/Signal ID for students. Use the test button above to verify Ntfy connectivity.</p>
           <form id="driver-poc-form" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
             <div style="flex: 1; min-width: 180px;">
               <label for="driver-poc-name" style="font-size: 11px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px;">DRIVER NAME / RANK</label>
@@ -275,12 +276,17 @@
           </div>
         </section>
 
-        <section class="panel qr-panel" style="margin-top: 24px;">
+        <!-- STUDENT NTFY SUBSCRIPTION & APP QR CARD -->
+        <section class="panel qr-panel" style="margin-top: 24px; background: linear-gradient(180deg, #fff 0%, #edf3ea 100%);">
           <div class="qr-copy">
-            <span class="section-kicker">SHARE THE RIDE</span>
-            <h3>Share Shuttle Tracker</h3>
-            <p>Have a battle buddy scan this code to track the van and request rides directly from their mobile browser.</p>
-            <span class="qr-url student-qr-url">Loading link...</span>
+            <span class="section-kicker">PHONE PUSH NOTIFICATIONS</span>
+            <h3>Subscribe to Instant Alerts</h3>
+            <p>Get buzz notifications on your phone whenever the van leaves, changes stops, or has available seats.</p>
+            <div style="margin-top: 10px;">
+              <a href="https://ntfy.sh/arc-knox-shuttle-8921" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; display:inline-block; padding:9px 16px; font-size:12px; margin-bottom: 8px;">🔔 Subscribe to Ntfy Topic</a>
+              <br>
+              <span class="qr-url student-qr-url">Loading link...</span>
+            </div>
           </div>
           <div class="qr-code-wrap">
             <img id="student-app-qr" width="156" height="156" alt="QR code for ARC Van App">
