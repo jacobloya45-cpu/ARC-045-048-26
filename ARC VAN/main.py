@@ -16,7 +16,10 @@ database.init_db()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DRIVER_PIN = "045048"
 MAX_CAPACITY = 15
-NTFY_TOPIC = "arc-knox-shuttle-8921"
+
+# Dedicated Separate Ntfy Topics
+NTFY_RIDER_TOPIC = "arc-knox-riders-8921"
+NTFY_DRIVER_TOPIC = "arc-knox-drivers-8921"
 
 ACTIVE_POC = database.get_driver_poc()
 
@@ -24,10 +27,10 @@ ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode = ssl.CERT_NONE
 
-def publish_ntfy(title: str, message: str, tags: str = "minibus") -> dict:
-    """Direct HTTP POST to ntfy.sh/<topic> with ASCII header safety"""
-    url = f"https://ntfy.sh/{NTFY_TOPIC}"
-    safe_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Van Alert"
+def publish_ntfy(topic: str, title: str, message: str, tags: str = "minibus") -> dict:
+    """Direct HTTP POST to specific ntfy.sh topic with clean ASCII headers"""
+    url = f"https://ntfy.sh/{topic}"
+    safe_title = title.encode("ascii", "ignore").decode("ascii").strip() or "ARC Shuttle Alert"
     safe_tags = tags.encode("ascii", "ignore").decode("ascii").strip() or "minibus"
     body = (message or "ARC Shuttle update").encode("utf-8")
 
@@ -44,13 +47,13 @@ def publish_ntfy(title: str, message: str, tags: str = "minibus") -> dict:
     )
     try:
         with urllib.request.urlopen(req, timeout=6, context=ssl_ctx) as resp:
-            print(f"✅ [NTFY SUCCESS] Status {resp.status} - '{safe_title}'")
+            print(f"✅ [NTFY SUCCESS -> {topic}] Status {resp.status} - '{safe_title}'")
             return {"success": True, "status": resp.status}
     except urllib.error.HTTPError as e:
-        print(f"❌ [NTFY HTTP ERROR] {e.code} - {e.reason}")
+        print(f"❌ [NTFY HTTP ERROR -> {topic}] {e.code} - {e.reason}")
         return {"success": False, "status": e.code, "error": str(e.reason)}
     except Exception as e:
-        print(f"❌ [NTFY GENERAL ERROR] {e}")
+        print(f"❌ [NTFY GENERAL ERROR -> {topic}] {e}")
         return {"success": False, "status": 500, "error": str(e)}
 
 class ConnectionManager:
@@ -78,6 +81,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# --- Pydantic Data Models ---
 class PinVerifyPayload(BaseModel):
     pin: str
 
@@ -142,8 +146,9 @@ def health():
 
 @app.get("/api/test-ntfy")
 def test_ntfy():
-    res = publish_ntfy("ARC Van Diagnostic Test", "Test alert triggered from server.", "bell,white_check_mark")
-    return res
+    r1 = publish_ntfy(NTFY_RIDER_TOPIC, "Rider Channel Test", "Test alert for students.", "white_check_mark")
+    r2 = publish_ntfy(NTFY_DRIVER_TOPIC, "Driver Channel Test", "Test alert for drivers.", "white_check_mark")
+    return {"rider_channel": r1, "driver_channel": r2}
 
 @app.post("/api/driver/verify-pin")
 def verify_driver_pin(payload: PinVerifyPayload):
@@ -166,7 +171,9 @@ async def set_poc(payload: DriverPOCPayload):
     ACTIVE_POC = {"driver_name": d_name, "contact_info": c_info, "updated_at": "Just now"}
     
     if d_name:
+        # Send Duty Driver update to Riders
         publish_ntfy(
+            NTFY_RIDER_TOPIC,
             f"Duty Driver: {d_name}",
             f"Active on-duty driver is {d_name}. Contact: {c_info or 'N/A'}",
             "identification_card,phone"
@@ -202,7 +209,8 @@ async def broadcast_alert(alert: AlertPayload):
     latest = database.get_latest_alert()
     queue_data = database.get_queue_data()
 
-    publish_ntfy(subject, body, "round_pushpin,bus")
+    # Van location and departures go to Rider channel
+    publish_ntfy(NTFY_RIDER_TOPIC, subject, body, "round_pushpin,bus")
 
     await manager.broadcast({
         "type": "NEW_ALERT",
@@ -259,7 +267,9 @@ async def request_ride(req: RideRequest):
     )
 
     contact_text = f" ({req.contact.strip()})" if req.contact else ""
+    # Ride request goes to Driver Channel
     publish_ntfy(
+        NTFY_DRIVER_TOPIC,
         f"Ride Request: {req.name.strip()}",
         f"Pickup: {req.pickup.strip()} -> Dropoff: {req.dropoff.strip()}{contact_text}",
         "taxi,bell"
@@ -289,7 +299,9 @@ async def heading_to_van(payload: WalkerPayload):
     )
 
     contact_text = f" ({payload.contact.strip()})" if payload.contact else ""
+    # Walker alert goes to Driver Channel
     publish_ntfy(
+        NTFY_DRIVER_TOPIC,
         f"Incoming Walker: {payload.name.strip()}",
         f"{payload.name.strip()} is heading to the pickup spot now{contact_text}.",
         "walking,information_source"
