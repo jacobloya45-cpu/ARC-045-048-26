@@ -44,15 +44,6 @@ let socket = null;
 let heartbeatTimer = null;
 let currentAlertRawTime = null;
 
-// Reliably routes all Ntfy requests through your own backend server
-function triggerNtfyAlert(title, message, tags = 'minibus') {
-  fetch('/api/ntfy-push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: title, message: message, tags: tags })
-  }).catch(() => {});
-}
-
 function loadSavedStudentProfile() {
   try {
     const raw = localStorage.getItem(studentProfileKey);
@@ -426,7 +417,7 @@ if (testNtfyBtn) {
         if (data.success) {
           showToast('✅ Ntfy push delivered! (200 OK)');
         } else {
-          showToast(`❌ Failed: Server error.`);
+          showToast(`❌ Ntfy Error: HTTP ${data.status} - ${data.detail || 'Failed'}`);
         }
       })
       .catch((err) => showToast(`❌ Connection error: ${err.message}`));
